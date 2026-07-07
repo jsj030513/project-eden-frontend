@@ -1,0 +1,18 @@
+:root {
+  --cream-50: #fffaf0;
+  --cream-100: #f8efd9;
+  --cream-200: #eadbbd;
+  --brown-900: #4a3024;
+  --brown-700: #76513c;
+  --brown-500: #a06b45;
+  --terracotta: #bd684d;
+  --terracotta-dark: #934935;
+  --amber: #e6a85f;
+  --sage: #7c9670;
+  --sage-dark: #536a4c;
+  --sky: #d9e1c5;
+  --paper: rgba(255, 250, 240, 0.92);
+  --shadow-soft: 0 24px 70px rgba(92, 57, 35, 0.16);
+  --font-serif: Georgia, 'Times New Roman', serif;
+  --font-sans: Pretendard, 'Noto Sans KR', system-ui, sans-serif;
+}
