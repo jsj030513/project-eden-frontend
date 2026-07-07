@@ -12,13 +12,19 @@ const PAGES = {
 
 function App() {
   const [page, setPage] = useState(PAGES.LANDING)
+  const [hasCaptured, setHasCaptured] = useState(false)
+
+  const returnToVillage = () => {
+    setHasCaptured(true)
+    setPage(PAGES.VILLAGE)
+  }
 
   const renderPage = () => {
     switch (page) {
       case PAGES.VILLAGE:
-        return <VillagePage onCapture={() => setPage(PAGES.CAPTURE)} />
+        return <VillagePage hasCaptured={hasCaptured} onCapture={() => setPage(PAGES.CAPTURE)} />
       case PAGES.CAPTURE:
-        return <CapturePage onBack={() => setPage(PAGES.VILLAGE)} />
+        return <CapturePage onBack={returnToVillage} />
       default:
         return <LandingPage onStart={() => setPage(PAGES.VILLAGE)} />
     }

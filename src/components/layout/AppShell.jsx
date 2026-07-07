@@ -6,10 +6,8 @@ function AppShell({ children, onLogoClick }) {
           <span className="brand__mark" aria-hidden="true">E</span>
           <span>PROJECT EDEN</span>
         </button>
-        <p>당신의 하루가 자라는 곳</p>
       </header>
       {children}
-      <footer className="app-footer">PROJECT EDEN <span>·</span> A VILLAGE THAT REMEMBERS</footer>
     </div>
   )
 }
