@@ -1,12 +1,16 @@
 import { expect, test } from '@playwright/test'
+import {
+  API_URL,
+  FIXTURE_EMAIL,
+  FIXTURE_PASSWORD,
+  FRONTEND_URL,
+  provisionLocalFixture,
+} from './village-e2e-fixture'
 
-const FRONTEND_URL = 'http://localhost:5173'
-const API_URL = 'http://localhost:8080'
-const FIXTURE_EMAIL = process.env.EDEN_E2E_EMAIL || 'village-polish-v8-fixture@local.test'
-const FIXTURE_PASSWORD = process.env.EDEN_E2E_PASSWORD
 const TILE_SIZE = 48
 
 test.describe.configure({ mode: 'serial' })
+test.beforeAll(async ({ request }) => provisionLocalFixture(request))
 
 function evidence(name, value) {
   console.log(`EVIDENCE ${name} ${JSON.stringify(value)}`)
@@ -36,7 +40,6 @@ async function enterVillage(page) {
 
   const email = page.getByRole('textbox', { name: '이메일' })
   if (await email.isVisible().catch(() => false)) {
-    if (!FIXTURE_PASSWORD) throw new Error('EDEN_E2E_PASSWORD is required')
     await email.fill(FIXTURE_EMAIL)
     await page.getByRole('textbox', { name: '비밀번호' }).fill(FIXTURE_PASSWORD)
     await page.getByRole('button', { name: '들어가기' }).click()
@@ -261,8 +264,8 @@ test('empty farm CTA opens capture without planting or upload requests', async (
   await routePlayer(page, token, { x: 4, y: 9 })
   await syncVillage(page)
 
-  await page.getByRole('button', { name: '좌표 3, 9 살펴보기' }).click({ force: true })
-  await expect(page.getByRole('heading', { name: '비어 있는 밭' })).toBeVisible()
+  await page.getByRole('button', { name: '비어 있는 밭 · 살펴보기' }).click()
+  await expect(page.getByRole('region', { name: '비어 있는 밭 살펴보기' })).toBeVisible()
 
   const responses = []
   const captureResponse = (response) => {
@@ -366,7 +369,7 @@ for (const viewport of [
 
       await routePlayer(page, token, { x: 10, y: 7 })
       await syncVillage(page)
-      await page.getByRole('button', { name: '마을 안내자와 대화하기' }).click()
+      await page.getByRole('button', { name: '마을 안내자 · 대화하기' }).click()
       const dialoguePanel = page.getByRole('region', { name: '마을 안내자와의 대화' })
       await expect(dialoguePanel).toBeVisible()
       const dialogueBox = await dialoguePanel.boundingBox()

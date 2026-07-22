@@ -229,19 +229,11 @@ function VillageScene({ compact = false, characterPosition, npcPosition, showNpc
         && interaction.y === selectedInteraction.y
         && interaction.type === selectedInteraction.type
     ))
-    if (!stillAvailable || !selectedDetails?.tile) setSelectedInteraction(null)
-  }, [availableInteractions, selectedDetails?.tile, selectedInteraction])
-
-  useEffect(() => {
-    if (!selectedInteraction) return undefined
-    const onKeyDown = (event) => {
-      if (event.key !== 'Escape' || event.target?.matches?.('input,textarea,[contenteditable=true]')) return
-      event.preventDefault()
-      closeSelection()
+    if (!stillAvailable || !selectedDetails?.tile) {
+      setSelectedInteraction(null)
+      onCloseInspect?.()
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [closeSelection, selectedInteraction])
+  }, [availableInteractions, onCloseInspect, selectedDetails?.tile, selectedInteraction])
 
   const isRevealActive = Boolean(revealState?.isPending || revealState?.isPlaying)
   const revealClass = isRevealActive

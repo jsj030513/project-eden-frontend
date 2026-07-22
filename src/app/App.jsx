@@ -178,6 +178,21 @@ function emptyCaptureState() {
   }
 }
 
+function normalizeCaptureTargetContext(context) {
+  if (!context || context.type !== 'INTERACT') return null
+  return {
+    type: 'INTERACT',
+    targetId: context.targetId ?? null,
+    targetAssetType: context.targetAssetType ?? null,
+    category: context.category ?? null,
+    x: Number.isInteger(context.x) ? context.x : null,
+    y: Number.isInteger(context.y) ? context.y : null,
+    displayName: typeof context.displayName === 'string' && context.displayName.trim()
+      ? context.displayName.trim()
+      : null,
+  }
+}
+
 function getPhotoId(photo) {
   return photo?.photoId ?? photo?.id ?? null
 }
@@ -233,6 +248,8 @@ function App() {
   const toastTimerRef = useRef(null)
   const revealStartTimerRef = useRef(null)
   const revealEndTimerRef = useRef(null)
+  const captureCompletionRef = useRef(false)
+  const skipNextVillageFetchRef = useRef(false)
   const [page, setPage] = useState(PAGES.LANDING)
   const [authState, setAuthState] = useState({
     accessToken: getAccessToken(),
@@ -248,6 +265,7 @@ function App() {
     error: null,
   })
   const [captureState, setCaptureState] = useState(emptyCaptureState)
+  const [captureTargetContext, setCaptureTargetContext] = useState(null)
   const [villageState, setVillageState] = useState({
     village: null,
     interpretation: null,
@@ -342,6 +360,10 @@ function App() {
     setVillageState({ village: null, interpretation: null, changes: [], history: [], notice: null, isLoading: false, error: null })
     setNpcState({ npcId: null, npcs: [], isOpen: false, dialogue: null, isLoading: false, error: null })
     setVillageRevealState(emptyRevealState())
+    setCaptureState(emptyCaptureState())
+    setCaptureTargetContext(null)
+    captureCompletionRef.current = false
+    skipNextVillageFetchRef.current = false
     setTutorialState(createInitialTutorialState(readTutorialCompleted()))
     setPage(PAGES.AUTH)
   }, [])
@@ -408,28 +430,29 @@ function App() {
         getMyNpcs(optionalRequestOptions),
         getMyWorldState(optionalRequestOptions),
       ])
-      const interpretation = interpretationResult.status === 'fulfilled' ? interpretationResult.value : null
-      const changes = changesResult.status === 'fulfilled' ? changesResult.value : []
-      const history = historyResult.status === 'fulfilled' ? historyResult.value : []
-      const npcs = npcsResult.status === 'fulfilled' ? npcsResult.value : []
-      const worldState = worldStateResult.status === 'fulfilled' ? worldStateResult.value : null
+      const interpretation = interpretationResult.status === 'fulfilled' ? interpretationResult.value : undefined
+      const changes = changesResult.status === 'fulfilled' ? changesResult.value : undefined
+      const history = historyResult.status === 'fulfilled' ? historyResult.value : undefined
+      const npcs = npcsResult.status === 'fulfilled' ? npcsResult.value : undefined
+      const worldState = worldStateResult.status === 'fulfilled' ? worldStateResult.value : undefined
       const hasPartialFailure = [interpretationResult, changesResult, historyResult, npcsResult, worldStateResult]
         .some((result) => result.status === 'rejected')
 
-      setVillageState({
+      setVillageState((current) => ({
+        ...current,
         village,
-        interpretation,
-        changes,
-        history,
+        interpretation: interpretation ?? current.interpretation,
+        changes: changes ?? current.changes,
+        history: history ?? current.history,
         notice: hasPartialFailure ? PARTIAL_VILLAGE_ERROR_MESSAGE : null,
         isLoading: false,
         error: null,
-        worldState,
-      })
+        worldState: worldState ?? current.worldState,
+      }))
       setNpcState((current) => ({
         ...current,
-        npcs,
-        npcId: npcs[0]?.id ?? current.npcId ?? import.meta.env.VITE_DEFAULT_NPC_ID ?? '1',
+        npcs: npcs ?? current.npcs,
+        npcId: npcs?.[0]?.id ?? current.npcId ?? import.meta.env.VITE_DEFAULT_NPC_ID ?? '1',
         error: null,
       }))
       return { village, interpretation, changes, history, npcs, worldState }
@@ -472,6 +495,10 @@ function App() {
 
   useEffect(() => {
     if (page !== PAGES.VILLAGE || !authState.isAuthenticated || !characterState.isReady) return
+    if (skipNextVillageFetchRef.current) {
+      skipNextVillageFetchRef.current = false
+      return
+    }
     fetchVillageData().catch(() => {})
   }, [authState.isAuthenticated, characterState.isReady, fetchVillageData, page])
 
@@ -527,6 +554,8 @@ function App() {
   })
 
   const completeRecognizedMoment = async (recognition, previousVillageSnapshot) => {
+    if (captureCompletionRef.current) return
+    captureCompletionRef.current = true
     setCaptureState((current) => ({ ...current, status: 'refreshingVillage' }))
     let nextVillageSnapshot
 
@@ -549,13 +578,15 @@ function App() {
 
     const revealState = buildRevealState(previousVillageSnapshot, nextVillageSnapshot, recognition)
 
-    setCaptureState((current) => ({ ...current, status: 'completed', isUploading: false, recognition }))
+    setCaptureState(emptyCaptureState())
     setVillageRevealState(revealState)
     setTutorialState((current) => (
       current.isActive && current.currentStep === TUTORIAL_STEPS.CAPTURE_MEMORY
         ? { ...current, hasCapturedMemory: true, currentStep: TUTORIAL_STEPS.WATCH_REVEAL }
         : current
     ))
+    setCaptureTargetContext(null)
+    skipNextVillageFetchRef.current = true
     setPage(PAGES.VILLAGE)
     window.clearTimeout(toastTimerRef.current)
     setSuccessToast(true)
@@ -590,6 +621,7 @@ function App() {
 
       await completeRecognizedMoment(recognition, previousVillageSnapshot)
     } catch (error) {
+      captureCompletionRef.current = false
       const failure = getCaptureFailure(error, failedStep)
       setCaptureState((current) => ({ ...current, status: failure.status, isUploading: false, error: failure.message }))
     }
@@ -623,6 +655,7 @@ function App() {
 
       await completeRecognizedMoment(recognition, previousVillageSnapshot)
     } catch (error) {
+      captureCompletionRef.current = false
       const failure = getCaptureFailure(error, 'RECOGNITION_FAILED')
       setCaptureState((current) => ({ ...current, status: failure.status, isUploading: false, error: failure.message }))
     }
@@ -705,19 +738,31 @@ function App() {
     }
   }, [handleTutorialEvent, page])
 
+  const closeCapture = useCallback(() => {
+    captureCompletionRef.current = false
+    skipNextVillageFetchRef.current = true
+    setCaptureTargetContext(null)
+    setCaptureState(emptyCaptureState())
+    setPage(PAGES.VILLAGE)
+  }, [])
+
   useEffect(() => {
     if (page !== PAGES.CAPTURE) return undefined
     const onKeyDown = (event) => {
       if (event.key !== 'Escape' || event.defaultPrevented || event.target?.matches?.('input,textarea,[contenteditable=true]')) return
       event.preventDefault()
-      setPage(PAGES.VILLAGE)
+      closeCapture()
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [page])
+  }, [closeCapture, page])
 
-  const openCapture = () => {
+  const openCapture = (targetContext = null) => {
+    if (page === PAGES.CAPTURE) return
     closeNpcDialogue()
+    captureCompletionRef.current = false
+    setCaptureState(emptyCaptureState())
+    setCaptureTargetContext(normalizeCaptureTargetContext(targetContext))
     setPage(PAGES.CAPTURE)
   }
 
@@ -780,8 +825,9 @@ function App() {
         return (
           <CapturePage
             captureState={captureState}
+            targetContext={captureTargetContext}
             tutorialState={tutorialState}
-            onBack={() => setPage(PAGES.VILLAGE)}
+            onBack={closeCapture}
             onSubmitMoment={submitMoment}
             onRetryRecognition={retryRecognition}
             onKeepUnknownMoment={keepUnknownMoment}
