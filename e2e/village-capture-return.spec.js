@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test'
 import {
   API_URL,
-  FIXTURE_EMAIL,
-  FIXTURE_PASSWORD,
   FRONTEND_URL,
+  createE2EFixture,
   provisionLocalFixture,
 } from './village-e2e-fixture'
 
@@ -11,9 +10,10 @@ const PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 )
+const fixture = createE2EFixture('village-capture')
 
 test.describe.configure({ mode: 'serial' })
-test.beforeAll(async ({ request }) => provisionLocalFixture(request))
+test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
 
 async function dismissOnboarding(page) {
   const explore = page.getByRole('button', { name: '천천히 둘러보기' })
@@ -28,8 +28,8 @@ async function enterVillage(page) {
   if (await enter.isVisible().catch(() => false)) await enter.click()
   const email = page.getByRole('textbox', { name: '이메일' })
   if (await email.isVisible().catch(() => false)) {
-    await email.fill(FIXTURE_EMAIL)
-    await page.getByRole('textbox', { name: '비밀번호' }).fill(FIXTURE_PASSWORD)
+    await email.fill(fixture.email)
+    await page.getByRole('textbox', { name: '비밀번호' }).fill(fixture.password)
     await page.getByRole('button', { name: '들어가기' }).click()
   }
   await expect(page.locator('.terrain-tile')).toHaveCount(384)
@@ -163,16 +163,41 @@ function recognitionFixture(photoId, recognizedObject = 'FLOWER') {
   }
 }
 
+function plantingFixture(photoId, recognizedObject = 'FLOWER') {
+  const recognition = recognitionFixture(photoId, recognizedObject)
+  const plantingApplied = recognizedObject !== 'UNKNOWN'
+  const worldChange = plantingApplied
+    ? {
+        ...recognition.worldChange,
+        assetType: 'FARM_FLOWER',
+        focusX: 144,
+        focusY: 432,
+        spawnedObjectIds: [990101],
+        villageChanged: true,
+      }
+    : null
+  return {
+    photoId,
+    targetId: 880101,
+    targetX: 3,
+    targetY: 9,
+    plantingApplied,
+    cropAssetType: plantingApplied ? 'FARM_FLOWER' : null,
+    recognition: { ...recognition, worldChange },
+    worldChange,
+  }
+}
+
 async function installSuccessfulCaptureRoutes(page, photoId, recognizedObject = 'FLOWER') {
-  const counts = { photo: 0, recognition: 0 }
+  const counts = { photo: 0, planting: 0 }
   await page.route('**/api/photos', async (route) => {
     if (route.request().method() !== 'POST') return route.continue()
     counts.photo += 1
     return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: photoId, photoId }) })
   })
-  await page.route(`**/api/photos/${photoId}/recognize`, async (route) => {
-    counts.recognition += 1
-    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(recognitionFixture(photoId, recognizedObject)) })
+  await page.route('**/api/worlds/me/plant-memory', async (route) => {
+    counts.planting += 1
+    return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(plantingFixture(photoId, recognizedObject)) })
   })
   return counts
 }
@@ -221,6 +246,7 @@ test('preserves target context through entry and clears it on mutation-free canc
   await page.getByRole('button', { name: '오늘의 순간 남기기' }).click()
   const generalCapture = page.getByLabel('따뜻한 숲과 노을을 담는 카메라 화면')
   await expect(generalCapture).toHaveAttribute('data-capture-context', 'general')
+  await expect(generalCapture).toHaveAttribute('data-capture-mode', 'GENERAL_MEMORY')
   await expect(generalCapture).not.toHaveAttribute('data-target-asset-type', /.+/)
   observer.stop()
   await page.keyboard.press('Escape')
@@ -245,10 +271,11 @@ test('successful capture returns once, refetches world state once, and reveals o
   await expect(page.locator('.village-reveal-layer')).toHaveCount(1)
   await expect(page.locator('.npc-dialogue-panel,.tile-inspect-panel')).toHaveCount(0)
   await expect(page.locator('.village-interaction-prompt')).toHaveCount(0)
-  expect(counts).toEqual({ photo: 1, recognition: 1 })
+  expect(counts).toEqual({ photo: 1, planting: 1 })
   expect(observer.count('GET', '/api/worlds/me/state')).toBe(1)
   expect(observer.count('GET', '/api/village/me')).toBe(1)
-  expect(observer.count('POST', '/plant')).toBe(0)
+  expect(observer.count('POST', '/recognize')).toBe(0)
+  expect(observer.count('POST', '/api/seeds/plant')).toBe(0)
   expect(observer.count('POST', 'world-change')).toBe(0)
   expect(consoleErrors).toEqual([])
   expect(pageErrors).toEqual([])
@@ -281,7 +308,7 @@ test('upload failure stays recoverable without duplicate upload or world mutatio
   await expect(page.getByLabel('따뜻한 숲과 노을을 담는 카메라 화면')).toHaveAttribute('data-capture-status', 'server-error')
   expect(uploadCount).toBe(1)
   expect(observer.count('POST', '/recognize')).toBe(0)
-  expect(observer.count('POST', '/plant')).toBe(0)
+  expect(observer.count('POST', '/plant-memory')).toBe(0)
   expect(observer.count('GET', '/api/worlds/me/state')).toBe(0)
   await expect(page.locator('.village-reveal-layer')).toHaveCount(0)
   const after = await worldState(page, token)
@@ -289,20 +316,20 @@ test('upload failure stays recoverable without duplicate upload or world mutatio
   observer.stop()
 })
 
-test('recognition failure preserves the world and does not reveal', async ({ page }) => {
+test('plant-memory failure preserves the uploaded photo and does not reveal', async ({ page }) => {
   const token = await enterVillage(page)
   const before = await worldState(page, token)
   await openEmptyFarmCapture(page, token)
   let uploadCount = 0
-  let recognitionCount = 0
+  let plantingCount = 0
   await page.route('**/api/photos', async (route) => {
     if (route.request().method() !== 'POST') return route.continue()
     uploadCount += 1
     return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 920001, photoId: 920001 }) })
   })
-  await page.route('**/api/photos/920001/recognize', async (route) => {
-    recognitionCount += 1
-    return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'fixture recognition failure' }) })
+  await page.route('**/api/worlds/me/plant-memory', async (route) => {
+    plantingCount += 1
+    return route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'fixture planting failure' }) })
   })
   const observer = observeRequests(page)
   await chooseFixtureImage(page)
@@ -310,9 +337,9 @@ test('recognition failure preserves the world and does not reveal', async ({ pag
 
   await expect(page.locator('.capture-error-card')).toBeVisible()
   expect(uploadCount).toBe(1)
-  expect(recognitionCount).toBe(1)
+  expect(plantingCount).toBe(1)
   expect(observer.count('GET', '/api/worlds/me/state')).toBe(0)
-  expect(observer.count('POST', '/plant')).toBe(0)
+  expect(observer.count('POST', '/recognize')).toBe(0)
   await expect(page.locator('.village-reveal-layer')).toHaveCount(0)
   const after = await worldState(page, token)
   expect(after.playerPosition).toEqual(before.playerPosition)
@@ -336,7 +363,7 @@ test('a world-state-only refetch failure retains the prior world and position', 
 
   await expect(page.locator('.village-stage')).toBeVisible()
   await expect(page.locator('.terrain-tile')).toHaveCount(384)
-  expect(counts).toEqual({ photo: 1, recognition: 1 })
+  expect(counts).toEqual({ photo: 1, planting: 1 })
   expect(worldStateFailures).toBe(1)
   expect(await screenPosition(page)).toEqual(beforeScreen)
   await expect(page.locator('.village-reveal-layer')).toHaveCount(1)
@@ -362,7 +389,7 @@ test('a full Village refresh failure falls back without duplicate navigation or 
   await expect(page.locator('.village-stage')).toBeVisible()
   await expect(page.locator('.terrain-tile')).toHaveCount(384)
   expect(await screenPosition(page)).toEqual(beforeScreen)
-  expect(counts).toEqual({ photo: 1, recognition: 1 })
+  expect(counts).toEqual({ photo: 1, planting: 1 })
   expect(villageFailures).toBe(1)
   expect(observer.count('GET', '/api/worlds/me/state')).toBe(0)
   await expect(page.locator('.village-reveal-layer')).toHaveCount(1)
@@ -372,7 +399,7 @@ test('a full Village refresh failure falls back without duplicate navigation or 
   observer.stop()
 })
 
-test('UNKNOWN recognition remains an explicit recoverable memory and returns safely', async ({ page }) => {
+test('non-plantable recognition returns safely without a crop reveal', async ({ page }) => {
   const token = await enterVillage(page)
   await openEmptyFarmCapture(page, token)
   const counts = await installSuccessfulCaptureRoutes(page, 950001, 'UNKNOWN')
@@ -380,13 +407,12 @@ test('UNKNOWN recognition remains an explicit recoverable memory and returns saf
   await chooseFixtureImage(page)
   await page.getByRole('button', { name: '기억 남기기' }).click()
 
-  await expect(page.locator('.capture-error-card--unknown')).toBeVisible()
-  await page.getByRole('button', { name: '이대로 남기기' }).click()
   await expect(page.locator('.village-stage')).toBeVisible()
-  await expect(page.locator('.village-reveal-layer')).toHaveCount(1)
-  expect(counts).toEqual({ photo: 1, recognition: 1 })
+  await expect(page.locator('.village-reveal-layer')).toHaveCount(0)
+  await expect(page.locator('.village-status')).toContainText('이 사진에서는 심을 수 있는 작물을 찾지 못했어요')
+  expect(counts).toEqual({ photo: 1, planting: 1 })
   expect(observer.count('GET', '/api/worlds/me/state')).toBe(1)
-  expect(observer.count('POST', '/plant')).toBe(0)
+  expect(observer.count('POST', '/recognize')).toBe(0)
   observer.stop()
 })
 

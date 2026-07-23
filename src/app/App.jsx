@@ -13,7 +13,7 @@ import { getMyNpcs, getNpcDialogue } from '../api/npcApi'
 import { uploadPhoto } from '../api/photoApi'
 import { recognizePhoto } from '../api/recognitionApi'
 import { getVillageChanges, getVillageHistory, getVillageInterpretation, getMyVillage } from '../api/villageApi'
-import { createHouse, createInventory, createWorld, getMyHouse, getMyInventory, getMyWorld, getMyWorldState, moveMyPlayer } from '../api/worldApi'
+import { createHouse, createInventory, createWorld, getMyHouse, getMyInventory, getMyWorld, getMyWorldState, moveMyPlayer, plantMemory } from '../api/worldApi'
 
 const PAGES = {
   LANDING: 'landing',
@@ -31,6 +31,15 @@ const UNKNOWN_RECOGNITION_MESSAGE = '이름을 붙이지 못한 순간도\n마�
 const NETWORK_RECOGNITION_MESSAGE = '마을로 이어지는 길이 잠시 멀어졌어요.'
 const SERVER_RECOGNITION_MESSAGE = '이 순간을 바라보는 데 조금 더 시간이 필요한 것 같아요.'
 const FILE_TOO_LARGE_MESSAGE = '사진이 조금 커서 마을까지 닿지 못했어요.'
+const NON_PLANTABLE_MEMORY_MESSAGE = '기억은 마을에 남았지만, 이 사진에서는 심을 수 있는 작물을 찾지 못했어요.'
+const PLANTING_ERROR_MESSAGE = '이 기억을 밭에 심는 동안 길이 잠시 흐려졌어요.'
+const PLANTING_CONFLICT_MESSAGES = Object.freeze({
+  TARGET_ALREADY_PLANTED: '그 사이 이 밭에 다른 기억이 심어졌어요. 마을에서 새 모습을 확인해 주세요.',
+  TARGET_CHANGED: '선택한 밭의 모습이 달라졌어요. 마을에서 다시 살펴봐 주세요.',
+  PHOTO_ALREADY_EXPRESSED: '이 사진은 이미 다른 기억으로 마을에 남아 있어요.',
+  TARGET_OUT_OF_RANGE: '밭에서 조금 멀어졌어요. 다시 가까이 다가간 뒤 시도해 주세요.',
+})
+const TARGET_REFRESH_CONFLICTS = new Set(['TARGET_ALREADY_PLANTED', 'TARGET_CHANGED', 'TARGET_OUT_OF_RANGE'])
 
 const DEFAULT_REVEAL_MESSAGE = '오늘의 순간이 마을 한편에 머물기 시작했습니다.'
 const CATEGORY_REVEAL_MESSAGES = {
@@ -174,13 +183,14 @@ function emptyCaptureState() {
     recognition: null,
     retryCount: 0,
     isUploading: false,
+    failedOperation: null,
     error: null,
   }
 }
 
 function normalizeCaptureTargetContext(context) {
   if (!context || context.type !== 'INTERACT') return null
-  return {
+  const normalized = {
     type: 'INTERACT',
     targetId: context.targetId ?? null,
     targetAssetType: context.targetAssetType ?? null,
@@ -191,6 +201,14 @@ function normalizeCaptureTargetContext(context) {
       ? context.displayName.trim()
       : null,
   }
+  const isTargetedPlanting = Number.isInteger(normalized.targetId)
+    && normalized.targetId > 0
+    && Number.isInteger(normalized.x)
+    && Number.isInteger(normalized.y)
+    && normalized.targetAssetType === 'FARM_PLOT_EMPTY'
+    && normalized.category === 'FARM'
+
+  return isTargetedPlanting ? normalized : null
 }
 
 function getPhotoId(photo) {
@@ -204,6 +222,31 @@ function isUnknownRecognition(recognition) {
   // claimed.  It must continue through the normal reveal flow rather than
   // presenting a false technical recognition failure.
   return recognizedObject === 'UNKNOWN' || recognition?.recognized === false
+}
+
+function normalizePlantingResponse(response) {
+  if (!response || typeof response !== 'object' || typeof response.plantingApplied !== 'boolean') {
+    throw new Error('심기 결과를 확인하지 못했습니다.')
+  }
+  if (!response.recognition || typeof response.recognition !== 'object') {
+    throw new Error('기억 인식 결과를 확인하지 못했습니다.')
+  }
+  if (response.plantingApplied && (!response.cropAssetType || !response.worldChange)) {
+    throw new Error('심어진 작물 정보를 확인하지 못했습니다.')
+  }
+
+  return {
+    ...response,
+    recognition: {
+      ...response.recognition,
+      worldChange: response.worldChange ?? response.recognition.worldChange ?? null,
+    },
+  }
+}
+
+function getPlantingConflictCode(error) {
+  const code = error?.details?.message || error?.message
+  return typeof code === 'string' && code.trim() ? code.trim() : null
 }
 
 function getCaptureFailure(error, failedStep) {
@@ -220,7 +263,9 @@ function getCaptureFailure(error, failedStep) {
 
   return {
     status: 'server-error',
-    message: failedStep === 'RECOGNITION_FAILED'
+    message: failedStep === 'PLANTING_FAILED'
+      ? PLANTING_ERROR_MESSAGE
+      : failedStep === 'RECOGNITION_FAILED'
       ? RECOGNITION_ERROR_MESSAGE
       : failedStep === 'VILLAGE_REFRESH_FAILED'
         ? VILLAGE_ERROR_MESSAGE
@@ -553,7 +598,11 @@ function App() {
       worldState: villageState.worldState,
   })
 
-  const completeRecognizedMoment = async (recognition, previousVillageSnapshot) => {
+  const completeRecognizedMoment = async (
+    recognition,
+    previousVillageSnapshot,
+    { reveal = true, notice = null, showSuccessToast = true } = {},
+  ) => {
     if (captureCompletionRef.current) return
     captureCompletionRef.current = true
     setCaptureState((current) => ({ ...current, status: 'refreshingVillage' }))
@@ -576,10 +625,15 @@ function App() {
       }))
     }
 
-    const revealState = buildRevealState(previousVillageSnapshot, nextVillageSnapshot, recognition)
+    const revealState = reveal
+      ? buildRevealState(previousVillageSnapshot, nextVillageSnapshot, recognition)
+      : emptyRevealState()
 
     setCaptureState(emptyCaptureState())
     setVillageRevealState(revealState)
+    if (notice) {
+      setVillageState((current) => ({ ...current, notice }))
+    }
     setTutorialState((current) => (
       current.isActive && current.currentStep === TUTORIAL_STEPS.CAPTURE_MEMORY
         ? { ...current, hasCapturedMemory: true, currentStep: TUTORIAL_STEPS.WATCH_REVEAL }
@@ -589,12 +643,69 @@ function App() {
     skipNextVillageFetchRef.current = true
     setPage(PAGES.VILLAGE)
     window.clearTimeout(toastTimerRef.current)
-    setSuccessToast(true)
-    toastTimerRef.current = window.setTimeout(() => setSuccessToast(false), 4200)
+    setSuccessToast(showSuccessToast)
+    if (showSuccessToast) {
+      toastTimerRef.current = window.setTimeout(() => setSuccessToast(false), 4200)
+    }
+  }
+
+  const finishTerminalPlantingFailure = async (error) => {
+    if (captureCompletionRef.current) return
+    captureCompletionRef.current = true
+    const code = getPlantingConflictCode(error)
+    const shouldRefresh = TARGET_REFRESH_CONFLICTS.has(code)
+    const message = PLANTING_CONFLICT_MESSAGES[code]
+      || (error?.status === 403 || error?.status === 404
+        ? '이 밭이나 사진을 더 이상 사용할 수 없어요. 마을에서 다시 확인해 주세요.'
+        : '심기 요청을 마무리하지 못했어요. 마을에서 밭을 다시 확인해 주세요.')
+
+    if (shouldRefresh) {
+      try {
+        await fetchVillageData({ suppressAuthRedirect: true })
+      } catch {
+        setVillageState((current) => ({ ...current, isLoading: false, error: null }))
+      }
+    }
+
+    setVillageState((current) => ({ ...current, notice: message, error: null }))
+    setCaptureState(emptyCaptureState())
+    setCaptureTargetContext(null)
+    setVillageRevealState(emptyRevealState())
+    skipNextVillageFetchRef.current = true
+    setPage(PAGES.VILLAGE)
+  }
+
+  const executeTargetedPlanting = async (photoId, previousVillageSnapshot) => {
+    if (!captureTargetContext) {
+      throw new Error('심을 밭 정보를 확인하지 못했습니다.')
+    }
+    setCaptureState((current) => ({
+      ...current,
+      status: 'plantingMemory',
+      failedOperation: null,
+    }))
+    const planting = normalizePlantingResponse(await plantMemory({
+      photoId,
+      targetId: captureTargetContext.targetId,
+      expectedX: captureTargetContext.x,
+      expectedY: captureTargetContext.y,
+    }, { suppressAuthRedirect: true }))
+
+    if (!planting.plantingApplied) {
+      await completeRecognizedMoment(planting.recognition, previousVillageSnapshot, {
+        reveal: false,
+        notice: NON_PLANTABLE_MEMORY_MESSAGE,
+        showSuccessToast: false,
+      })
+      return
+    }
+
+    await completeRecognizedMoment(planting.recognition, previousVillageSnapshot)
   }
 
   const submitMoment = async (file) => {
     const previousVillageSnapshot = getCurrentVillageSnapshot()
+    const isTargetedPlanting = Boolean(captureTargetContext)
 
     setCaptureState((current) => ({ ...current, status: 'uploadingPhoto', isUploading: true, error: null }))
     let failedStep = 'PHOTO_UPLOAD_FAILED'
@@ -603,6 +714,12 @@ function App() {
       const photo = await uploadPhoto(file)
       const photoId = getPhotoId(photo)
       setCaptureState((current) => ({ ...current, uploadedPhotoId: photoId }))
+
+      if (isTargetedPlanting) {
+        failedStep = 'PLANTING_FAILED'
+        await executeTargetedPlanting(photoId, previousVillageSnapshot)
+        return
+      }
 
       failedStep = 'RECOGNITION_FAILED'
       setCaptureState((current) => ({ ...current, status: 'recognizing' }))
@@ -622,8 +739,18 @@ function App() {
       await completeRecognizedMoment(recognition, previousVillageSnapshot)
     } catch (error) {
       captureCompletionRef.current = false
+      if (isTargetedPlanting && (error?.status === 403 || error?.status === 404 || error?.status === 409)) {
+        await finishTerminalPlantingFailure(error)
+        return
+      }
       const failure = getCaptureFailure(error, failedStep)
-      setCaptureState((current) => ({ ...current, status: failure.status, isUploading: false, error: failure.message }))
+      setCaptureState((current) => ({
+        ...current,
+        status: failure.status,
+        isUploading: false,
+        failedOperation: failedStep,
+        error: failure.message,
+      }))
     }
   }
 
@@ -631,15 +758,22 @@ function App() {
     if (!captureState.uploadedPhotoId || captureState.isUploading || captureState.retryCount >= 2) return
 
     const previousVillageSnapshot = getCurrentVillageSnapshot()
+    const isTargetedPlanting = Boolean(captureTargetContext)
     setCaptureState((current) => ({
       ...current,
-      status: 'recognizing',
+      status: isTargetedPlanting ? 'plantingMemory' : 'recognizing',
       isUploading: true,
+      failedOperation: null,
       error: null,
       retryCount: current.retryCount + 1,
     }))
 
     try {
+      if (isTargetedPlanting) {
+        await executeTargetedPlanting(captureState.uploadedPhotoId, previousVillageSnapshot)
+        return
+      }
+
       const recognition = await recognizePhoto(captureState.uploadedPhotoId, { suppressAuthRedirect: true })
 
       if (isUnknownRecognition(recognition)) {
@@ -656,8 +790,19 @@ function App() {
       await completeRecognizedMoment(recognition, previousVillageSnapshot)
     } catch (error) {
       captureCompletionRef.current = false
-      const failure = getCaptureFailure(error, 'RECOGNITION_FAILED')
-      setCaptureState((current) => ({ ...current, status: failure.status, isUploading: false, error: failure.message }))
+      if (isTargetedPlanting && (error?.status === 403 || error?.status === 404 || error?.status === 409)) {
+        await finishTerminalPlantingFailure(error)
+        return
+      }
+      const failedStep = isTargetedPlanting ? 'PLANTING_FAILED' : 'RECOGNITION_FAILED'
+      const failure = getCaptureFailure(error, failedStep)
+      setCaptureState((current) => ({
+        ...current,
+        status: failure.status,
+        isUploading: false,
+        failedOperation: failedStep,
+        error: failure.message,
+      }))
     }
   }
 

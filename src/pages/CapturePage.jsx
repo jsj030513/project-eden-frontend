@@ -8,6 +8,7 @@ const CAPTURE_STATE = {
 const STATUS_MESSAGE = {
   uploadingPhoto: '오늘의 순간을 마을로 옮기고 있습니다.',
   recognizing: '마을이 이 순간을 천천히 바라보고 있습니다.',
+  plantingMemory: '이 기억이 밭에 머물 자리를 찾고 있습니다.',
   refreshingVillage: '작은 변화가 풍경 어딘가에 머물고 있습니다.',
   completed: '오늘의 순간이 마을에 조용히 남았습니다.',
 }
@@ -102,13 +103,14 @@ function CapturePage({
   }, [captureState.status])
 
   const recoveryStatuses = ['unknown', 'network-error', 'server-error', 'file-too-large', 'input-error', 'auth-error', 'error']
-  const isServerBusy = ['uploadingPhoto', 'recognizing', 'refreshingVillage'].includes(captureState.status)
+  const isServerBusy = ['uploadingPhoto', 'recognizing', 'plantingMemory', 'refreshingVillage'].includes(captureState.status)
   const isRecovery = recoveryStatuses.includes(captureState.status)
   const isIdle = localCaptureState === CAPTURE_STATE.IDLE && !isServerBusy && !isRecovery
   const isPreview = localCaptureState === CAPTURE_STATE.PREVIEW && !isServerBusy && !isRecovery
   const isTutorialActive = Boolean(tutorialState?.isActive)
   const canRetryRecognition = Boolean(captureState.uploadedPhotoId) && captureState.retryCount < 2 && !captureState.isUploading
   const canReconnect = Boolean(selectedFile) && !captureState.isUploading
+  const shouldRetryUpload = captureState.failedOperation === 'PHOTO_UPLOAD_FAILED' && canReconnect
   const isUnknownRecovery = captureState.status === 'unknown'
   const recoveryCopy = {
     unknown: {
@@ -163,6 +165,7 @@ function CapturePage({
         aria-label="따뜻한 숲과 노을을 담는 카메라 화면"
         data-capture-status={captureState.status}
         data-capture-context={targetContext ? 'contextual' : 'general'}
+        data-capture-mode={targetContext ? 'TARGETED_PLANTING' : 'GENERAL_MEMORY'}
         data-target-id={targetContext?.targetId ?? undefined}
         data-target-asset-type={targetContext?.targetAssetType ?? undefined}
         data-target-category={targetContext?.category ?? undefined}
@@ -237,8 +240,8 @@ function CapturePage({
                   <button
                     type="button"
                     className="capture-actions__quiet"
-                    onClick={isUnknownRecovery ? resetSelection : captureState.status === 'network-error' && !captureState.uploadedPhotoId ? saveMemory : retryCurrentPhoto}
-                    disabled={isUnknownRecovery ? captureState.isUploading : captureState.status === 'network-error' && !captureState.uploadedPhotoId ? !canReconnect : !canRetryRecognition}
+                    onClick={isUnknownRecovery ? resetSelection : shouldRetryUpload ? saveMemory : retryCurrentPhoto}
+                    disabled={isUnknownRecovery ? captureState.isUploading : shouldRetryUpload ? false : !canRetryRecognition}
                   >
                     {recoveryCopy.secondary}
                   </button>

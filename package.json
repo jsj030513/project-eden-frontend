@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "test:e2e:village": "playwright test e2e/village-final-evidence.spec.js",
     "test:e2e:village-contextual": "playwright test e2e/village-contextual-interaction.spec.js",
-    "test:e2e:village-capture": "playwright test e2e/village-capture-return.spec.js"
+    "test:e2e:village-capture": "playwright test e2e/village-capture-return.spec.js",
+    "test:e2e:village-planting": "playwright test e2e/village-targeted-planting.spec.js",
+    "test:e2e:village-all": "playwright test e2e/village-final-evidence.spec.js e2e/village-contextual-interaction.spec.js e2e/village-capture-return.spec.js e2e/village-targeted-planting.spec.js"
   },
   "dependencies": {
     "react": "^19.2.7",

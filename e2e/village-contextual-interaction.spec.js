@@ -1,9 +1,8 @@
 import { expect, test } from '@playwright/test'
 import {
   API_URL,
-  FIXTURE_EMAIL,
-  FIXTURE_PASSWORD,
   FRONTEND_URL,
+  createE2EFixture,
   provisionLocalFixture,
 } from './village-e2e-fixture'
 import {
@@ -12,8 +11,10 @@ import {
   selectCurrentHudInteraction,
 } from '../src/components/village/contextualInteraction'
 
+const fixture = createE2EFixture('village-contextual')
+
 test.describe.configure({ mode: 'serial' })
-test.beforeAll(async ({ request }) => provisionLocalFixture(request))
+test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
 
 async function dismissOnboarding(page) {
   const explore = page.getByRole('button', { name: '천천히 둘러보기' })
@@ -29,8 +30,8 @@ async function enterVillage(page) {
 
   const email = page.getByRole('textbox', { name: '이메일' })
   if (await email.isVisible().catch(() => false)) {
-    await email.fill(FIXTURE_EMAIL)
-    await page.getByRole('textbox', { name: '비밀번호' }).fill(FIXTURE_PASSWORD)
+    await email.fill(fixture.email)
+    await page.getByRole('textbox', { name: '비밀번호' }).fill(fixture.password)
     await page.getByRole('button', { name: '들어가기' }).click()
   }
 
