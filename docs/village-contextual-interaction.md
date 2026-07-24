@@ -183,3 +183,169 @@ The real non-plantable flow created Photo `58` and Recognition `45` for `CAT`, r
 The final isolated suite inventory is 40 scenarios: Village 6, Contextual 10, Capture Return 10, and Targeted Planting 14. Both official aggregate runs passed completely. `npm run lint` completed with zero warnings, `npm run build` completed successfully, and `git diff --check` passed.
 
 Village MVP Polish 2차-C frontend target-aware Capture, safe terminal conflicts, response-loss retry, reload persistence, fixture isolation, and repeat-run evidence are complete. Crop harvest/economy, crop growth UI, new NPC progression, and new community functionality remain out of scope.
+
+## Template NPC dialogue architecture
+
+Village template dialogue now has one canonical renderer, `NpcDialogue.jsx`, and one case-safe pure script module, `npcDialogueScript.js`. The former conflicting lowercase `npcDialogue.js` path was removed. `VillagePage` opens a DIALOGUE panel only from the first server-ordered `TALK` entry in `availableInteractions`; it does not calculate pixel distance or manufacture a template-NPC interaction locally.
+
+The official Village roles are:
+
+- `DEFAULT_NPC_GUIDE` → 마을 안내자: movement, nearby interaction, and memory guidance.
+- `DEFAULT_NPC_GARDENER` → 정원 관리인: empty plots and supported memory planting.
+- `DEFAULT_NPC_MEMORY_KEEPER` → 기억 보관인: persistent memories and world refresh.
+- `DEFAULT_NPC_ANIMAL_CARETAKER` → 동물 돌봄이: nearby default animal inspection.
+
+Each read-only script has three session-local lines. Unknown assets use a two-line generic fallback instead of crashing. Next advances through a clamped line index; the final action is 대화 마치기. Close, Escape, server-authoritative TALK disappearance after range exit, NPC switching, another panel, Capture entry, refresh, or unmount resets the index. Reopening always starts at the first line.
+
+## Legacy NPC boundary
+
+The fixed-coordinate “모아” prompt, world bubble, and parallel dialogue panel are no longer rendered in the Village. The legacy backend API and its entities remain untouched for compatibility, but template placed-object ids are never sent to `/api/npcs/{id}/dialogue` and are never persisted as `NpcMemory` identities. Template dialogue open, Next, and Close are mutation-free.
+
+## Template dialogue panel coordination
+
+DIALOGUE uses the existing single `activePanel` coordinator with INSPECT and CONTEXTUAL. Opening one clears the others. Capture first closes the active Village panel and does not restore it on return. When the selected server interaction disappears, the panel closes and its session state resets. The dialogue region exposes the NPC name as a heading, accessible panel and close labels, keyboard-focusable actions, and Escape behavior.
+
+## Template NPC E2E evidence
+
+`e2e/village-npc-dialogue.spec.js` completed 9/9 scenarios:
+
+- pure resolver coverage for all four assets, generic fallback, index clamp, and Next/Close labels;
+- complete ordered sessions for all four template NPCs with correct names and zero dialogue/photo/seed/world mutations;
+- Escape reset, NPC switching, server-authoritative range exit, and first-line restart;
+- DIALOGUE/CONTEXTUAL/Capture mutual exclusion with no stale restoration;
+- refresh without session restoration while authoritative TALK remains available;
+- complete touch dialogue at 375×667, 390×844, and 430×932.
+
+All three mobile runs kept the panel within the viewport, kept the dynamic joystick pad visually inactive behind the modal dialogue, avoided action-bar overlap and document overflow, and exposed every Next/Close control. The aggregate command then completed all 49 Village, Contextual, Capture, Planting, and NPC scenarios in 3.2 minutes. Individual evidence remained Village 6/6, Contextual 10/10, Capture 10/10, Planting 14/14, and NPC 9/9.
+
+## D1 closure boundary before D2
+
+At the D1 closure point, the Community memory summary and richer animal contextual work had not started. D1 added no NPC affinity, quest, reward, economy, generated dialogue, persistent conversation progress, template/legacy identity mapping, media endpoint, or backend dialogue mutation.
+
+## Community recent history summary
+
+The existing `villageState.history` payload is the only Community source. `App` already retrieves it as part of the existing Village aggregate load, so opening the Community panel performs no new fetch. The client consumes the real fields `historyType`, `category`, `changeType`, `message`, and `createdAt`; it does not invent a title or asset value that the response does not contain.
+
+`normalizeVillageHistory` rejects non-arrays, null items, objects without a non-blank message, and malformed timestamps without throwing. `selectRecentVillageHistory` sorts valid timestamps newest-first, preserves the original order for ties, keeps duplicate identifiers safe by including stable source position in the render key, and returns at most three entries. Entries without a valid timestamp remain readable without a fabricated date. Empty or wholly invalid input renders:
+
+> 아직 마을에 기록된 기억이 없어요.<br>
+> 사진으로 기억을 남기면 이곳에서 다시 볼 수 있어요.
+
+Ownership is inherited from the authenticated `/api/village/history` contract. The E2E fixture created NATURE history for the current account and ANIMAL history for another isolated account, then verified that the Community summary showed only the current user's latest three messages.
+
+## Read-only animal contextual copy
+
+The contextual resolver owns one stable copy mapping:
+
+- `DEFAULT_DOG` — 강아지: “마을을 지켜보며 조용히 쉬고 있는 강아지예요.”
+- `DEFAULT_CAT` — 고양이: “따뜻한 햇볕 아래에서 편안히 쉬고 있는 고양이예요.”
+- `DEFAULT_BIRD` — 새: “마을의 작은 소리를 들으며 주변을 바라보는 새예요.”
+
+Unknown future ANIMAL metadata uses the generic “동물 친구” fallback. These panels expose only their accessible heading, description, and labelled Close action. They do not promise feeding, naming, following, affinity, rewards, or any mutation.
+
+## Community and animal panel coordination
+
+Community and animal interactions reuse the single `activePanel` coordinator. Closing with the button or Escape returns focus to the originating HUD prompt when it remains connected, otherwise to the keyboard-focusable Village stage. Server-authoritative range disappearance closes the panel; re-entry starts a fresh session. Community→Crop, Community→Capture, Animal→NPC TALK, and NPC/Animal switching leave one panel and no stale history or dialogue state.
+
+The Community list is a semantic heading plus ordered list. Long messages wrap safely, the panel retains its existing max-height scrolling boundary, and its date column collapses below the message at narrow widths. Capture entry clears the current panel and never restores it on return.
+
+## D2 network and responsive evidence
+
+`e2e/village-community-animal.spec.js` completed 9/9 scenarios. It covers pure malformed/latest/duplicate helpers, populated history, empty history, maximum-three/latest ordering, user isolation, Community Escape/range/re-entry, all three animal copies, read-only mutation evidence, cross-panel transitions, focus return, and three mobile touch contexts.
+
+Community/Animal open and close produced zero Photo, planting, world-change, seed, NPC-dialogue, or other mutation POSTs. Existing movement POST and world-state/history GET requests remain allowed. No Community-specific request or endpoint was introduced.
+
+| Viewport | Community | Animal | Overflow | Safe area |
+|---|---|---|---|---|
+| 375×667 | 3 records, Close reachable | Dog prompt/panel/Escape | none | pass |
+| 390×844 | 3 records, Close reachable | Cat prompt/panel/Escape | none | pass |
+| 430×932 | 3 records, Close reachable | Bird prompt/panel/Escape | none | pass |
+
+Each context used `hasTouch=true`, `isMobile=true`, and device scale factor `2`; coarse pointer, hover-none, and positive touch-point assertions passed. Physical iPhone Safari was not tested.
+
+## D2 regression evidence
+
+Individual Playwright results were Village 6/6, Contextual 10/10, Capture 10/10, Targeted Planting 14/14, Template NPC 9/9, and Community/Animal 9/9. The final aggregate command includes all six specs and completed 58/58 in 4.3 minutes. `npm run lint` and `npm run build` passed, and frontend/backend `git diff --check` passed.
+
+## 2-D3 boundary
+
+D2 adds no Community interior, full history page, edit/delete/share/comment action, animal mutation, affinity, feeding, naming, media, quest, reward, generated dialogue, new API, or persistence. These remain outside the read-only closure and no 2-D3 implementation has started.
+
+## 2-D3 final integration evidence
+
+D3 added no product feature, API, persistence, or migration. It closed the
+remaining evidence gap with one explicit animal Escape/range-exit/re-entry
+scenario and runtime page-error/React-warning guards in the D1 and D2 browser
+suites. All six official Village specs now run without file-level serial mode.
+The two D specs
+also passed together with two Playwright workers: 19/19 in 2.1 minutes, with
+no fixture identity, coordinate, target, or panel-state collision.
+
+The individual final results were:
+
+- Village final evidence: 6/6.
+- Contextual interaction: 10/10.
+- Capture return: 10/10.
+- Targeted planting: 14/14.
+- Template NPC dialogue: 9/9.
+- Community/Animal: 10/10.
+
+`npm run test:e2e:village-all` therefore contains 59 scenarios. It passed
+twice consecutively with one official worker, in 5.4 and 5.9 minutes.
+`npm run lint` completed with zero warnings, `npm run build` completed
+successfully, and `git diff --check` passed.
+
+## D3 NPC, Community, Animal, and panel closure
+
+All four template NPCs completed their three-line local sessions with Next,
+final Close, Escape reset, authoritative range exit, target switching, refresh
+reset, one dialogue panel, and zero dialogue/photo/planting/world mutations.
+The legacy fixed “모아” Village prompt remained absent.
+
+Community history retained newest-first ordering, a maximum of three,
+authenticated-user isolation, malformed-input safety, and the explicit empty
+state. Dog, Cat, and Bird retained distinct read-only copy and each proved
+Escape, authoritative range exit, and re-entry. The combined suite
+covered Community→Capture, Community→Crop, Animal→NPC, NPC→Animal, and
+NPC→Capture. Every transition closed the previous panel and did not restore
+stale dialogue/history state after Capture.
+
+The frontend continues to consume the first available server interaction
+without recalculating priority. Backend evidence confirms
+`TALK > INTERACT > INSPECT` and deterministic tie ordering.
+
+## D3 responsive, accessibility, console, and network matrix
+
+Chromium mobile contexts at 375×667, 390×844, and 430×932 used
+`hasTouch=true`, `isMobile=true`, device scale factor `2`, coarse pointer,
+hover-none, and positive touch points. NPC dialogue, Community history,
+Dog/Cat/Bird contextual panels, and Capture transitions remained within each
+viewport with reachable labelled controls and no document overflow. Physical
+iPhone Safari was not tested.
+
+Dialogue/contextual regions expose accessible names and headings. Next/Close
+buttons are labelled; Escape and trigger/root focus return passed. The D1/D2
+runtime guards observed no uncaught page error, React key/duplicate/hydration
+warning, module-resolution warning, or accessibility runtime warning. The
+case-sensitive import remains exactly `NpcDialogue.jsx` →
+`npcDialogueScript.js`.
+
+Opening or advancing NPC, Community, and Animal panels produced no dialogue,
+Photo, planting, seed, or world-change mutation POST. World-state/history GET
+and authoritative movement POST remained allowed. Capture mutations occur only
+after an explicit Capture transition and are covered separately by the Capture
+and Planting suites.
+
+## D3 reproducibility and distribution gate
+
+The pre-commit audit found that `npcDialogueScript.js`,
+`village-npc-dialogue.spec.js`, and `village-community-animal.spec.js` were
+untracked even though they are required D files. The final D review explicitly
+includes those files with the tracked dialogue, contextual-interaction, E2E,
+script, styling, and documentation changes.
+
+Earlier required infrastructure, including `useCharacterMovement.js` and the
+backend terrain/world-state source group, remains owned by previous phases and
+is not folded into the D commits. The current complete dirty worktree therefore
+still has a broader clean-checkout blocker even though the D-owned files
+themselves are captured. No push is performed as part of this closure.

@@ -9,7 +9,6 @@ import {
 const TILE_SIZE = 48
 const fixture = createE2EFixture('village-final')
 
-test.describe.configure({ mode: 'serial' })
 test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
 
 function evidence(name, value) {

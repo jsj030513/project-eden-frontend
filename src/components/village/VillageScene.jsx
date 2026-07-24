@@ -1,5 +1,4 @@
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import NpcDialogue from './NpcDialogue'
 
 const CAMERA_ZOOM = 0.66
 const WORLD_SIZE = {
@@ -42,21 +41,6 @@ const PixelPerson = forwardRef(function PixelPerson({ npc = false, characterPosi
     </div>
   )
 })
-
-function NpcWithDialogue({ npcPosition, showNpcDialogue, message, dialogueVariant, dialogueKey }) {
-  return (
-    <div
-      className={`npc-wrapper${showNpcDialogue ? ' is-dialogue-visible' : ''}`}
-      style={{
-        left: `${npcPosition.x}px`,
-        top: `${npcPosition.y}px`,
-      }}
-    >
-      {showNpcDialogue && <NpcDialogue message={message} variant={dialogueVariant} dialogueKey={dialogueKey} />}
-      <PixelPerson npc />
-    </div>
-  )
-}
 
 function toClassToken(value, fallback) {
   return String(value || fallback).toLowerCase().replaceAll('_', '-')
@@ -172,7 +156,7 @@ function TileInspectPanel({ details, onClose, onPlantMemory }) {
   )
 }
 
-function VillageScene({ compact = false, characterPosition, npcPosition, showNpcDialogue = false, hasMemory = false, apiTheme, revealState, tutorialStep, npcMessage = '', npcDialogueVariant = 'message', npcDialogueKey, worldState, characterElementRef, worldElementRef, onPlantMemory, activePanel = 'NONE', onOpenInspect, onCloseInspect }) {
+function VillageScene({ compact = false, characterPosition, hasMemory = false, apiTheme, revealState, tutorialStep, worldState, characterElementRef, worldElementRef, onPlantMemory, activePanel = 'NONE', onOpenInspect, onCloseInspect }) {
   const [selectedInteraction, setSelectedInteraction] = useState(null)
   const lastInteractionButtonRef = useRef(null)
   const terrainTiles = worldState?.terrainTiles || EMPTY_ARRAY
@@ -303,15 +287,6 @@ function VillageScene({ compact = false, characterPosition, npcPosition, showNpc
         <VillageChangeReveal revealState={revealState} />
         <div className="pixel-lamp"><i /><span /></div>
         <PixelPerson ref={characterElementRef} characterPosition={characterPosition} />
-        {npcPosition ? (
-          <NpcWithDialogue
-            npcPosition={npcPosition}
-            showNpcDialogue={showNpcDialogue}
-            message={npcMessage}
-            dialogueVariant={npcDialogueVariant}
-            dialogueKey={npcDialogueKey}
-          />
-        ) : <PixelPerson npc />}
         <div className="ground-details detail--one">· ·</div><div className="ground-details detail--two">· ˚ ·</div><div className="ground-details detail--three">˙ ·</div>
       </div>
       <div className="scene-vignette" />

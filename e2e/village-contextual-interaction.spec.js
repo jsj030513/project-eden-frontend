@@ -13,7 +13,6 @@ import {
 
 const fixture = createE2EFixture('village-contextual')
 
-test.describe.configure({ mode: 'serial' })
 test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
 
 async function dismissOnboarding(page) {
@@ -263,9 +262,9 @@ test('renders asset-specific crop contextual panels', async ({ page }) => {
 test('renders dog, cat, and bird contextual panels without TALK conversion', async ({ page }) => {
   const token = await enterVillage(page)
   const cases = [
-    { player: { x: 17, y: 10 }, asset: 'DEFAULT_DOG', name: '강아지', copy: '강아지가 반갑게 꼬리를 흔들어요.' },
-    { player: { x: 18, y: 10 }, asset: 'DEFAULT_CAT', name: '고양이', copy: '고양이가 조용히 마을을 바라보고 있어요.' },
-    { player: { x: 19, y: 9 }, asset: 'DEFAULT_BIRD', name: '새', copy: '새가 주변을 살피며 지저귀고 있어요.' },
+    { player: { x: 17, y: 10 }, asset: 'DEFAULT_DOG', name: '강아지', copy: '마을을 지켜보며 조용히 쉬고 있는 강아지예요.' },
+    { player: { x: 18, y: 10 }, asset: 'DEFAULT_CAT', name: '고양이', copy: '따뜻한 햇볕 아래에서 편안히 쉬고 있는 고양이예요.' },
+    { player: { x: 19, y: 9 }, asset: 'DEFAULT_BIRD', name: '새', copy: '마을의 작은 소리를 들으며 주변을 바라보는 새예요.' },
   ]
 
   for (const item of cases) {

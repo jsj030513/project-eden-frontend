@@ -13,7 +13,6 @@ const PNG_BUFFER = Buffer.from(
 )
 const fixture = createE2EFixture('village-planting')
 
-test.describe.configure({ mode: 'serial' })
 test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
 
 async function dismissOnboarding(page) {

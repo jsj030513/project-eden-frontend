@@ -4,29 +4,32 @@ import VillageScene from '../components/village/VillageScene'
 import VillageStatusText from '../components/village/VillageStatusText'
 import { TUTORIAL_EVENTS, TUTORIAL_STEPS } from '../constants/tutorialSteps'
 import { useCharacterMovement } from '../hooks/useCharacterMovement'
-import { resolveNpcDialogue } from '../components/village/NpcDialogue'
+import NpcDialogue from '../components/village/NpcDialogue'
+import { nextNpcDialogueIndex, resolveNpcDialogue } from '../components/village/npcDialogueScript'
 import {
   interactionMatches,
   resolveContextualInteraction,
   resolveHudInteraction,
+  selectRecentVillageHistory,
   selectCurrentHudInteraction,
 } from '../components/village/contextualInteraction'
 
 const TUTORIAL_MOVE_DISTANCE = 32
 const EMPTY_INTERACTIONS = Object.freeze([])
 
-function VillagePage({ villageState, npcState, villageRevealState, tutorialState, successToast, captureOpen = false, onCapture, onRetryVillage, onTalkToNpc, onCloseNpcDialogue, onLeaveNpcRange, onTutorialEvent, onMove, onMovementEnd }) {
+function VillagePage({ villageState, villageRevealState, tutorialState, successToast, captureOpen = false, onCapture, onRetryVillage, onTutorialEvent, onMove, onMovementEnd }) {
   const [activePanel, setActivePanel] = useState('NONE')
   const [templateDialogue, setTemplateDialogue] = useState(null)
+  const [dialogueLineIndex, setDialogueLineIndex] = useState(0)
   const [contextualInteraction, setContextualInteraction] = useState(null)
   const captureTargetRef = useRef(null)
   const tutorialMoveStartRef = useRef(null)
   const characterElementRef = useRef(null)
   const worldElementRef = useRef(null)
+  const villageStageRef = useRef(null)
+  const lastPanelTriggerRef = useRef(null)
   const {
     characterPosition,
-    npcPosition,
-    showNpcDialogue,
     setJoystickVector,
     stopJoystick,
   } = useCharacterMovement({ worldState: villageState.worldState, onMove, onMovementEnd, characterElementRef, worldElementRef })
@@ -48,13 +51,28 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
     : activePanel === 'CONTEXTUAL'
       ? interactionMatches(currentHudInteraction, contextualInteraction)
       : false
-  const templateDialogueContent = templateDialogue ? resolveNpcDialogue(templateDialogue) : null
+  const templateDialogueContent = templateDialogue
+    ? resolveNpcDialogue(templateDialogue, dialogueLineIndex)
+    : null
   const contextualContent = contextualInteraction ? resolveContextualInteraction(contextualInteraction) : null
-  const closeActivePanel = useCallback(() => {
+  const recentCommunityHistory = useMemo(
+    () => selectRecentVillageHistory(villageState.history),
+    [villageState.history],
+  )
+  const resetActivePanel = useCallback(() => {
     setActivePanel('NONE')
     setTemplateDialogue(null)
+    setDialogueLineIndex(0)
     setContextualInteraction(null)
   }, [])
+  const closeActivePanel = useCallback(() => {
+    resetActivePanel()
+    window.requestAnimationFrame(() => {
+      const trigger = lastPanelTriggerRef.current
+      if (trigger?.isConnected) trigger.focus()
+      else villageStageRef.current?.focus()
+    })
+  }, [resetActivePanel])
   const openMemoryUpload = useCallback((interaction = null) => {
     captureTargetRef.current = interaction ? {
       type: interaction.type,
@@ -65,41 +83,47 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
       category: interaction.category,
       displayName: interaction.displayName,
     } : null
-    closeActivePanel()
+    resetActivePanel()
     onCapture(captureTargetRef.current)
-  }, [closeActivePanel, onCapture])
-  const openHudInteraction = useCallback(() => {
+  }, [onCapture, resetActivePanel])
+  const openHudInteraction = useCallback((event) => {
     if (!currentHudInteraction || captureOpen) return
-    onCloseNpcDialogue?.()
+    lastPanelTriggerRef.current = event.currentTarget
     if (currentHudInteraction.type === 'TALK') {
       setContextualInteraction(null)
       setTemplateDialogue(currentHudInteraction)
+      setDialogueLineIndex(0)
       setActivePanel('DIALOGUE')
+      if (tutorialState?.currentStep === TUTORIAL_STEPS.TALK_AGAIN) {
+        onTutorialEvent?.(TUTORIAL_EVENTS.TALKED_AFTER_REVEAL)
+      } else if (tutorialState?.currentStep === TUTORIAL_STEPS.TALK_TO_NPC) {
+        onTutorialEvent?.(TUTORIAL_EVENTS.TALKED_TO_NPC)
+      }
       return
     }
     if (currentHudInteraction.type === 'INTERACT') {
       setTemplateDialogue(null)
+      setDialogueLineIndex(0)
       setContextualInteraction(currentHudInteraction)
       setActivePanel('CONTEXTUAL')
     }
-  }, [captureOpen, currentHudInteraction, onCloseNpcDialogue])
+  }, [captureOpen, currentHudInteraction, onTutorialEvent, tutorialState?.currentStep])
   const openInspect = useCallback(() => {
     if (captureOpen) return
-    onCloseNpcDialogue?.()
     setTemplateDialogue(null)
+    setDialogueLineIndex(0)
     setContextualInteraction(null)
     setActivePanel('INSPECT')
-  }, [captureOpen, onCloseNpcDialogue])
-  const openLegacyNpcDialogue = useCallback(() => {
-    closeActivePanel()
-    onTalkToNpc()
-  }, [closeActivePanel, onTalkToNpc])
-
-  useEffect(() => {
-    if (!showNpcDialogue && npcState.isOpen) {
-      onLeaveNpcRange()
+  }, [captureOpen])
+  const advanceTemplateDialogue = useCallback(() => {
+    if (!templateDialogue) return
+    const resolved = resolveNpcDialogue(templateDialogue, dialogueLineIndex)
+    if (resolved.isLastLine) {
+      closeActivePanel()
+      return
     }
-  }, [npcState.isOpen, onLeaveNpcRange, showNpcDialogue])
+    setDialogueLineIndex((current) => nextNpcDialogueIndex(templateDialogue, current))
+  }, [closeActivePanel, dialogueLineIndex, templateDialogue])
 
   useEffect(() => {
     const selected = activePanel === 'DIALOGUE'
@@ -114,7 +138,7 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
     if (!isStillAvailable) closeActivePanel()
   }, [activePanel, availableInteractions, closeActivePanel, contextualInteraction, templateDialogue])
 
-  useEffect(() => { if (captureOpen) closeActivePanel() }, [captureOpen, closeActivePanel])
+  useEffect(() => { if (captureOpen) resetActivePanel() }, [captureOpen, resetActivePanel])
 
   useEffect(() => {
     if (activePanel === 'NONE') return undefined
@@ -149,16 +173,12 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
   }, [characterPosition.x, characterPosition.y, onTutorialEvent, tutorialState?.currentStep, tutorialState?.isActive])
 
   useEffect(() => {
-    if (tutorialState?.isActive && tutorialState.currentStep === TUTORIAL_STEPS.APPROACH_NPC && showNpcDialogue) {
+    if (tutorialState?.isActive
+      && tutorialState.currentStep === TUTORIAL_STEPS.APPROACH_NPC
+      && currentHudInteraction?.type === 'TALK') {
       onTutorialEvent?.(TUTORIAL_EVENTS.APPROACHED_NPC)
     }
-  }, [onTutorialEvent, showNpcDialogue, tutorialState?.currentStep, tutorialState?.isActive])
-
-  useEffect(() => {
-    if (tutorialState?.isActive && tutorialState.currentStep === TUTORIAL_STEPS.TALK_TO_NPC && npcState.isOpen && npcState.dialogue) {
-      onTutorialEvent?.(TUTORIAL_EVENTS.TALKED_TO_NPC)
-    }
-  }, [npcState.dialogue, npcState.isOpen, onTutorialEvent, tutorialState?.currentStep, tutorialState?.isActive])
+  }, [currentHudInteraction?.type, onTutorialEvent, tutorialState?.currentStep, tutorialState?.isActive])
 
   const isRevealActive = Boolean(villageRevealState?.isPending || villageRevealState?.isPlaying)
   const statusMessage = isRevealActive
@@ -168,20 +188,16 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
     villageState.village?.totalMemoryCount
     || (villageState.interpretation?.theme && villageState.interpretation.theme !== 'UNDEFINED'),
   )
-  const canTalkToNpc = showNpcDialogue && !npcState.isLoading
-  const shouldShowNpcPanel = showNpcDialogue && (npcState.isOpen || npcState.isLoading || npcState.error)
-  const npcPanelMessage = npcState.isLoading
-    ? '무슨 말을 건넬지 천천히 생각하고 있습니다.'
-    : npcState.error || npcState.dialogue?.message
-
   return (
-    <main className={`village-page page-enter${isRevealActive ? ' is-revealing' : ''}`}>
-      <section className="village-stage" aria-label="노을빛이 머무는 에덴 마을">
+    <main className={`village-page page-enter${isRevealActive ? ' is-revealing' : ''}${activePanel === 'DIALOGUE' ? ' has-template-dialogue' : ''}`}>
+      <section
+        ref={villageStageRef}
+        className="village-stage"
+        aria-label="노을빛이 머무는 에덴 마을"
+        tabIndex={-1}
+      >
         <VillageScene
           characterPosition={characterPosition}
-          npcPosition={npcPosition}
-          showNpcDialogue={showNpcDialogue && !npcState.isOpen}
-          npcDialogueVariant="hint"
           hasMemory={hasMemory}
           apiTheme={villageState.interpretation?.theme}
           expressions={villageState.interpretation?.expressions}
@@ -196,7 +212,6 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
           changes={villageState.changes}
           revealState={villageRevealState}
           tutorialStep={tutorialState?.isActive ? tutorialState.currentStep : null}
-          npcMessage="말을 걸 수 있어요"
         />
         <aside className="weather-panel" aria-label="마을 시간과 날씨">
           <span className="weather-panel__sun" aria-hidden="true">☀</span>
@@ -217,41 +232,19 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
             오늘의 순간이 마을에<br />조용히 남았습니다.
           </div>
         )}
-        {showNpcDialogue && !shouldShowNpcPanel && !currentHudInteraction && activePanel === 'NONE' && !isRevealActive && (
-          <div className="npc-talk-panel">
-            <button type="button" onClick={openLegacyNpcDialogue} disabled={!canTalkToNpc} aria-label="모아와 대화하기">
-              <span aria-hidden="true">💬</span>
-              <b>대화</b>
-            </button>
-          </div>
-        )}
-        {shouldShowNpcPanel && (
-          <section className="npc-dialogue-panel" aria-live="polite" aria-label="모아와의 대화">
-            <div className="npc-dialogue-panel__copy">
-              <strong>모아 <span>· 마을지기</span></strong>
-              <p>{npcPanelMessage}</p>
-              {import.meta.env.DEV && npcState.dialogue?.dialogueKey && (
-                <small>{npcState.dialogue.dialogueKey}</small>
-              )}
-            </div>
-            <div className="npc-dialogue-panel__actions">
-              <button type="button" onClick={openLegacyNpcDialogue} disabled={!canTalkToNpc}>
-                {npcState.isLoading ? '듣는 중...' : '다시 이야기하기'}
-              </button>
-              <button type="button" className="npc-dialogue-panel__quiet" onClick={onCloseNpcDialogue} disabled={npcState.isLoading}>
-                닫기
-              </button>
-            </div>
-          </section>
-        )}
-        {currentHudInteraction && currentHudContent && !shouldShowNpcPanel && !currentHudPanelIsOpen && !isRevealActive && (
+        {currentHudInteraction && currentHudContent && !currentHudPanelIsOpen && !isRevealActive && (
           <div
             className="npc-talk-panel village-interaction-prompt"
             data-interaction-type={currentHudInteraction.type}
             data-interaction-category={currentHudInteraction.category || 'UNKNOWN'}
             data-target-asset-type={currentHudInteraction.targetAssetType || 'UNKNOWN'}
           >
-            <button type="button" onClick={openHudInteraction} aria-label={`${currentHudContent.displayName} · ${currentHudContent.actionLabel}`}>
+            <button
+              ref={lastPanelTriggerRef}
+              type="button"
+              onClick={openHudInteraction}
+              aria-label={`${currentHudContent.displayName} · ${currentHudContent.actionLabel}`}
+            >
               <span aria-hidden="true">{currentHudInteraction.type === 'TALK' ? '💬' : '✦'}</span>
               <span className="village-interaction-prompt__copy">
                 <small>{currentHudContent.displayName}</small>
@@ -261,10 +254,11 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
           </div>
         )}
         {activePanel === 'DIALOGUE' && templateDialogueContent && (
-          <section className="npc-dialogue-panel" aria-live="polite" aria-label={`${templateDialogueContent.displayName}와의 대화`}>
-            <div className="npc-dialogue-panel__copy"><strong>{templateDialogueContent.displayName}</strong><p>{templateDialogueContent.message}</p></div>
-            <div className="npc-dialogue-panel__actions"><button type="button" className="npc-dialogue-panel__quiet" onClick={closeActivePanel}>닫기</button></div>
-          </section>
+          <NpcDialogue
+            dialogue={templateDialogueContent}
+            onNext={advanceTemplateDialogue}
+            onClose={closeActivePanel}
+          />
         )}
         {activePanel === 'CONTEXTUAL' && contextualInteraction && contextualContent && (
           <section
@@ -276,14 +270,40 @@ function VillagePage({ villageState, npcState, villageRevealState, tutorialState
             <div className="npc-dialogue-panel__copy">
               <h2 className="contextual-interaction-panel__title">{contextualContent.displayName}</h2>
               <p>{contextualContent.description}</p>
+              {contextualInteraction.category === 'COMMUNITY' && (
+                <section className="community-history-summary" aria-labelledby="community-history-heading">
+                  <h3 id="community-history-heading">최근 마을 기록</h3>
+                  {recentCommunityHistory.length ? (
+                    <ol>
+                      {recentCommunityHistory.map((history) => (
+                        <li key={history.key}>
+                          <span>{history.message}</span>
+                          {history.dateLabel && <time dateTime={history.createdAt}>{history.dateLabel}</time>}
+                        </li>
+                      ))}
+                    </ol>
+                  ) : (
+                    <p className="community-history-summary__empty">
+                      아직 마을에 기록된 기억이 없어요.<br />
+                      사진으로 기억을 남기면 이곳에서 다시 볼 수 있어요.
+                    </p>
+                  )}
+                </section>
+              )}
             </div>
             <div className="npc-dialogue-panel__actions">
               {contextualContent.primaryActionLabel && (
-                <button type="button" onClick={() => openMemoryUpload(contextualInteraction)}>
+                <button type="button" onClick={() => openMemoryUpload(contextualInteraction)} autoFocus>
                   {contextualContent.primaryActionLabel}
                 </button>
               )}
-              <button type="button" className="npc-dialogue-panel__quiet" onClick={closeActivePanel} aria-label={`${contextualContent.displayName} 정보 닫기`}>
+              <button
+                type="button"
+                className="npc-dialogue-panel__quiet"
+                onClick={closeActivePanel}
+                aria-label={`${contextualContent.displayName} 정보 닫기`}
+                autoFocus={!contextualContent.primaryActionLabel}
+              >
                 닫기
               </button>
             </div>
