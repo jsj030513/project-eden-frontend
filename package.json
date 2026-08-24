@@ -14,7 +14,15 @@
     "test:e2e:village-planting": "playwright test e2e/village-targeted-planting.spec.js",
     "test:e2e:village-npc": "playwright test e2e/village-npc-dialogue.spec.js",
     "test:e2e:village-community-animal": "playwright test e2e/village-community-animal.spec.js",
-    "test:e2e:village-all": "playwright test e2e/village-final-evidence.spec.js e2e/village-contextual-interaction.spec.js e2e/village-capture-return.spec.js e2e/village-targeted-planting.spec.js e2e/village-npc-dialogue.spec.js e2e/village-community-animal.spec.js"
+    "test:e2e:village-phase3a": "playwright test e2e/village-phase3a-viewport.spec.js",
+    "test:e2e:village-phase3b": "playwright test e2e/village-phase3b-chunk-cache.spec.js",
+    "test:e2e:village-phase3b-closure": "playwright test e2e/village-phase3b-footprint.spec.js",
+    "test:e2e:village-phase3c": "playwright test e2e/village-phase3c-regions.spec.js",
+    "test:e2e:village-phase3c-journey": "playwright test e2e/village-phase3c-journey.spec.js",
+    "test:e2e:village-phase3c-closure": "playwright test e2e/village-phase3c-closure.spec.js",
+    "test:e2e:village-all": "playwright test e2e/village-final-evidence.spec.js e2e/village-contextual-interaction.spec.js e2e/village-capture-return.spec.js e2e/village-targeted-planting.spec.js e2e/village-npc-dialogue.spec.js e2e/village-community-animal.spec.js",
+    "test:e2e:village-phase4a1": "playwright test e2e/village-phase4a1-npc.spec.js",
+    "test:e2e:village-phase4a2": "playwright test e2e/village-phase4a1-npc.spec.js --grep phase4a2"
   },
   "dependencies": {
     "react": "^19.2.7",

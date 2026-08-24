@@ -428,6 +428,44 @@ body{overscroll-behavior:none;background:var(--forest-deep)}
 /* Regression hotfix: restore world layers without changing camera, HUD, tutorial, or movement */
 .village-scene{width:100vw;height:100dvh;min-height:100svh;background:#4f743d;overflow:hidden}
 .village-world{overflow:visible}
+
+/* Compact server-authored village. The 24×16 backend grid is 1152×768px;
+   desktop shows that complete board while mobile keeps the player camera. */
+.village-world{width:1152px;height:768px}
+.pixel-sky{display:none}
+.grass-tiles{inset:0;z-index:0}
+.persistent-terrain{z-index:2}
+.persistent-world-objects{z-index:8}
+.village-world::before{display:none}
+.persistent-object{display:block;transition:left .55s linear,top .55s linear}
+.persistent-object i{position:absolute;display:block;pointer-events:none}
+.asset-plaza{width:46px;height:30px;background:#a78966;border-color:#5f4d3e;border-radius:50%;box-shadow:inset 0 5px #d4c09b,0 -18px 0 -10px #67a9b3}
+.asset-plaza::before{content:'';position:absolute;left:15px;top:-25px;width:12px;height:28px;background:#7b694f;border:3px solid #4a3d31}
+.asset-community_house{width:88px;height:66px;background:#c69258;border:4px solid #51382a;box-shadow:inset 0 -10px #9b653d,6px 7px rgba(35,43,29,.3)}
+.asset-community_house::before{content:'';position:absolute;left:-9px;right:-9px;top:-31px;height:34px;background:#754638;border:4px solid #442c25;clip-path:polygon(50% 0,100% 100%,0 100%)}
+.asset-community_house::after{content:'';position:absolute;left:34px;bottom:0;width:18px;height:31px;background:#60402f;border:3px solid #3c2b24}
+.asset-default_npc_guide,.asset-default_npc_gardener,.asset-default_npc_memory_keeper,.asset-default_npc_animal_caretaker{width:22px;height:32px;border-color:#3c2b24;border-radius:45% 45% 20% 20%;box-shadow:0 7px 0 -3px rgba(35,43,29,.35)}
+.asset-default_npc_guide{background:#d9a95d}.asset-default_npc_gardener{background:#6e9a54}.asset-default_npc_memory_keeper{background:#8b6fa4}.asset-default_npc_animal_caretaker{background:#b86d55}
+.is-world-npc::before{content:'';position:absolute;left:4px;top:-12px;width:11px;height:11px;background:#e4b98f;border:2px solid #51382a;border-radius:50%}
+.asset-default_dog,.asset-default_cat,.asset-default_bird{border-color:#3d3027;box-shadow:0 6px 0 -3px rgba(35,43,29,.3)}
+.asset-default_dog{width:25px;height:17px;background:#b57a49;border-radius:45% 55% 35% 35%}
+.asset-default_dog::before{content:'';position:absolute;left:-6px;top:-6px;width:12px;height:13px;background:#b57a49;border:2px solid #3d3027;border-radius:45%}
+.asset-default_dog::after{content:'';position:absolute;right:-8px;top:2px;width:9px;height:4px;background:#8e5b38;transform:rotate(-35deg)}
+.asset-default_cat{width:21px;height:16px;background:#d39a69;border-radius:50% 50% 35% 35%}
+.asset-default_cat::before{content:'';position:absolute;left:1px;top:-10px;width:13px;height:12px;background:#d39a69;border:2px solid #3d3027;clip-path:polygon(0 0,32% 28%,70% 28%,100% 0,90% 100%,10% 100%)}
+.asset-default_cat::after{content:'';position:absolute;right:-9px;top:-7px;width:12px;height:12px;border:3px solid #b6794e;border-left:0;border-bottom:0;border-radius:50%}
+.asset-default_bird{width:16px;height:12px;background:#d8c25e;border-radius:55% 45% 50% 50%}
+.asset-default_bird::before{content:'';position:absolute;left:4px;top:2px;width:10px;height:7px;background:#7ca6b3;clip-path:polygon(0 50%,100% 0,72% 100%)}
+.asset-default_bird::after{content:'';position:absolute;right:-7px;top:2px;border-left:7px solid #dd7b39;border-top:3px solid transparent;border-bottom:3px solid transparent}
+.is-world-animal{will-change:left,top}
+.asset-flower_cluster{width:31px;height:25px;background:radial-gradient(circle at 25% 35%,#ef9ab2 0 4px,transparent 5px),radial-gradient(circle at 70% 25%,#f2c879 0 4px,transparent 5px),radial-gradient(circle at 52% 72%,#d8b3df 0 4px,transparent 5px);border:0;box-shadow:none}
+.asset-tree_grove{width:36px;height:48px;border-radius:48% 48% 35% 35%;box-shadow:inset -8px -5px #31552e,0 8px 0 -5px #765035}
+.asset-visitor{width:23px;height:17px;border-radius:45%}
+.asset-pond{width:48px;height:25px;border-radius:50%;box-shadow:inset 0 5px rgba(190,238,225,.3),3px 4px rgba(35,67,62,.25)}
+@media (min-width:900px) and (min-height:700px){
+  .village-scene{background:#294a31}
+  .village-world{overflow:hidden;box-shadow:0 0 0 5px #263c2b,0 16px 42px rgba(12,28,20,.42)}
+}
 .village-world::before{content:'';position:absolute;z-index:0;left:-1800px;right:-1800px;top:0;bottom:-900px;background:linear-gradient(#614e45 0 172px,#54783f 172px 100%);pointer-events:none}
 .pixel-sky,.grass-tiles{z-index:1}.pixel-path{z-index:3}.pixel-water{z-index:4;display:block;visibility:visible;opacity:1}.pond-edge-detail{z-index:5}.pixel-bridge{z-index:8}
 .village-reveal-layer{z-index:9}.pixel-lamp{z-index:10}.pixel-character{z-index:12}.npc-wrapper{z-index:13}
@@ -468,13 +506,373 @@ body{overscroll-behavior:none;background:var(--forest-deep)}
 .terrain-soil{background:repeating-linear-gradient(90deg,#765035 0 8px,#925f3d 8px 15px);box-shadow:inset 0 2px rgba(232,177,103,.3)}
 .asset-farm_tomato{width:18px;height:20px;background:#4c873e;border-color:#31592d;border-radius:45%;box-shadow:-4px 8px 0 -2px #d9533c,5px 7px 0 -2px #e36543}
 .asset-farm_cabbage{width:21px;height:19px;background:#7ca84d;border-color:#365e32;border-radius:48%;box-shadow:inset 4px 2px rgba(215,239,137,.32)}
-.asset-community_house{width:48px;height:38px;background:#d4b079;border:4px solid #5a382a;box-shadow:inset 0 -12px #9a7048,0 -18px 0 -4px #813f35}
-.asset-default_npc_guide,.asset-default_npc_gardener,.asset-default_npc_memory_keeper,.asset-default_npc_animal_caretaker{width:17px;height:29px;background:#d6a072;border:3px solid #4a3025;border-radius:45% 45% 20% 20%;box-shadow:0 -11px 0 -2px #59402d}
-.asset-default_npc_gardener{background:#799a4d}.asset-default_npc_memory_keeper{background:#8570a1}.asset-default_npc_animal_caretaker{background:#bf8755}
-.asset-default_dog{width:26px;height:15px;background:#bd8652;border-color:#56392b;border-radius:50% 50% 35% 35%;box-shadow:-7px -5px 0 -2px #bd8652,12px -7px 0 -5px #56392b}
-.asset-default_cat{width:20px;height:19px;background:#cc9c5d;border-color:#543927;border-radius:45%;clip-path:polygon(0 26%,22% 0,42% 20%,61% 0,82% 25%,100% 100%,0 100%)}
-.asset-default_bird{width:15px;height:14px;background:#6a91bd;border-color:#314967;border-radius:50%;box-shadow:8px 2px 0 -6px #e6c35e}
+
+/* Compact Village visual correction.
+   Logical coordinates, hitboxes and residents still come from world-state.
+   This layer only gives those contracts a dense, readable pixel-RPG setting. */
+.village-world{
+  background:#61924a;
+  box-shadow:0 0 0 6px #263c2b,0 18px 46px rgba(11,24,16,.48);
+}
+.grass-tiles{
+  background-color:#61924a;
+  background-image:
+    linear-gradient(90deg,rgba(49,103,45,.12) 1px,transparent 1px),
+    linear-gradient(rgba(49,103,45,.1) 1px,transparent 1px),
+    radial-gradient(circle at 25% 30%,rgba(197,218,112,.38) 0 1px,transparent 2px),
+    radial-gradient(circle at 72% 68%,rgba(38,91,39,.34) 0 1px,transparent 2px);
+  background-size:48px 48px,48px 48px,23px 19px,31px 29px;
+}
+.terrain-tile{background:rgba(104,154,73,.34);box-shadow:inset 1px 1px rgba(206,224,137,.08)}
+.terrain-road{
+  background:
+    radial-gradient(circle at 28% 36%,#e2bf72 0 2px,transparent 3px),
+    radial-gradient(circle at 70% 68%,#a87642 0 2px,transparent 3px),
+    #c79557;
+  box-shadow:inset 5px 0 rgba(237,203,124,.22),inset -5px 0 rgba(120,79,43,.2);
+}
+.terrain-forest{
+  background:
+    radial-gradient(circle at 30% 25%,rgba(117,165,70,.42) 0 4px,transparent 5px),
+    radial-gradient(circle at 75% 70%,rgba(38,82,38,.5) 0 5px,transparent 6px),
+    #426d3a;
+}
+.terrain-water{
+  background:
+    linear-gradient(170deg,transparent 0 42%,rgba(141,225,214,.28) 43% 49%,transparent 50% 100%),
+    #3996aa;
+  box-shadow:inset 0 7px rgba(143,223,216,.22);
+}
+.terrain-building,.terrain-rock,.terrain-cliff{background:#506244}
+.terrain-soil{
+  background:
+    repeating-linear-gradient(90deg,transparent 0 9px,rgba(76,42,25,.38) 10px 13px,transparent 14px 24px),
+    #87532f;
+  box-shadow:inset 0 5px rgba(207,145,76,.28),inset 0 -4px rgba(66,39,25,.3);
+}
+
+.village-visual-decor{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden}
+.visual-path{position:absolute;height:44px;background:#c89555;border:4px solid #87582f;border-width:4px 0;box-shadow:inset 0 5px rgba(235,199,119,.28),inset 0 -5px rgba(110,68,38,.2);transform-origin:left center}
+.visual-path::after{content:'';position:absolute;inset:6px 0;background:radial-gradient(circle at 15% 45%,#79502d 0 2px,transparent 3px),radial-gradient(circle at 62% 67%,#e1b96c 0 2px,transparent 3px);background-size:36px 27px,44px 31px;opacity:.7}
+.visual-path--northwest{left:330px;top:236px;width:220px;transform:rotate(23deg)}
+.visual-path--west{left:245px;top:342px;width:260px;transform:rotate(-6deg)}
+.visual-path--east{left:550px;top:326px;width:326px;transform:rotate(-3deg)}
+.visual-path--southeast{left:578px;top:385px;width:330px;transform:rotate(31deg)}
+.visual-path--south{left:510px;top:376px;width:370px;transform:rotate(90deg)}
+
+.visual-plaza{position:absolute;left:396px;top:236px;width:272px;height:214px;border:8px solid #9b673a;border-radius:47%;background:radial-gradient(ellipse at center,#d5b66e 0 48%,#bd8f50 49% 68%,#a96f3c 69% 100%);box-shadow:inset 0 0 0 7px rgba(241,211,132,.38),0 8px 0 rgba(73,49,29,.22)}
+.visual-plaza::before{content:'';position:absolute;left:50%;top:50%;width:152px;height:118px;border:4px dashed rgba(116,75,39,.32);border-radius:50%;transform:translate(-50%,-50%)}
+.visual-bench{position:absolute;top:92px;width:46px;height:13px;background:#8b542d;border:3px solid #4d321f;box-shadow:inset 0 4px #bd7d40}
+.visual-bench::after{content:'';position:absolute;left:5px;right:5px;bottom:-10px;height:8px;border-left:5px solid #4d321f;border-right:5px solid #4d321f}
+.visual-bench--left{left:12px;transform:rotate(90deg)}.visual-bench--right{right:12px;transform:rotate(90deg)}
+.visual-lamp{position:absolute;top:24px;width:8px;height:58px;background:#5b3a25;border:2px solid #36251c}
+.visual-lamp::before{content:'';position:absolute;left:-8px;top:-13px;width:19px;height:18px;background:#f2c661;border:3px solid #4c3322;box-shadow:0 0 13px rgba(246,203,97,.62),inset 3px 3px #fff0a6}
+.visual-lamp--left{left:42px}.visual-lamp--right{right:42px}
+
+.visual-farm{position:absolute;border:6px solid #5c3a24;background:#7f4e2e;box-shadow:inset 0 0 0 5px rgba(187,118,59,.34),0 7px 0 rgba(49,45,27,.24)}
+.visual-farm::before{content:'';position:absolute;inset:8px;background:repeating-linear-gradient(90deg,transparent 0 18px,rgba(59,35,23,.42) 19px 23px,transparent 24px 48px)}
+.visual-farm>b{position:absolute;z-index:2;left:10px;top:-25px;padding:5px 8px;color:#fff4da;background:#3d291f;border:3px solid #291c17;box-shadow:3px 3px rgba(25,28,17,.3);font:8px var(--font-pixel);white-space:nowrap}
+.visual-farm>i{position:absolute;z-index:2;width:12px;height:12px;background:#d9a955;border:3px solid #49311f}
+.visual-farm>i:nth-of-type(1){left:-11px;top:-10px}.visual-farm>i:nth-of-type(2){right:-11px;bottom:-10px}
+.visual-farm--flowers{left:132px;top:178px;width:212px;height:116px}
+.visual-farm--empty{left:84px;top:418px;width:212px;height:116px;background:#72462d}
+.visual-farm--carrots{left:84px;top:562px;width:212px;height:116px}
+.visual-farm--vegetables{left:324px;top:466px;width:212px;height:116px}
+
+.visual-pond{position:absolute;left:756px;top:512px;width:356px;height:238px;border:10px solid #315d45;border-radius:46% 37% 42% 31%;background:radial-gradient(ellipse at 56% 38%,#4fb7c3 0 14%,#3199ae 46%,#237b91 76%,#1d6477 100%);box-shadow:inset 0 12px rgba(157,232,218,.22),0 -5px 0 #72954c,0 8px 0 rgba(35,54,34,.34);overflow:visible}
+.visual-pond::before{content:'';position:absolute;inset:-18px;border:7px dotted rgba(96,119,66,.9);border-radius:48% 36% 44% 32%}
+.pond-ripple{position:absolute;width:54px;height:15px;border:4px solid rgba(151,225,215,.58);border-top:0;border-bottom-color:transparent;border-radius:50%}
+.pond-ripple--one{left:74px;top:54px}.pond-ripple--two{right:54px;top:130px;transform:scale(.72)}
+.pond-lotus{position:absolute;width:26px;height:16px;background:#79a93f;border:3px solid #385f32;border-radius:55% 0 55% 0;transform:rotate(-18deg)}
+.pond-lotus::after{content:'';position:absolute;left:7px;top:-8px;width:10px;height:10px;background:#f3a6bc;border:2px solid #934f68;border-radius:50%}
+.pond-lotus--one{left:112px;top:116px}.pond-lotus--two{right:72px;top:70px;transform:rotate(19deg) scale(.8)}
+.pond-reeds{position:absolute;bottom:10px;width:6px;height:43px;background:#4d7c34;box-shadow:9px -8px #668f38,17px 2px #3e6b31}
+.pond-reeds::before{content:'';position:absolute;left:-1px;top:-8px;width:8px;height:15px;background:#7d552d;border-radius:45%}
+.pond-reeds--one{left:24px}.pond-reeds--two{right:40px;transform:scale(.8)}
+.pond-stone{position:absolute;width:36px;height:24px;background:#667265;border:4px solid #37483d;border-radius:50%;box-shadow:inset 7px 5px #879383}
+.pond-stone--one{left:-9px;top:55px}.pond-stone--two{right:11px;bottom:12px;transform:scale(.75)}
+.visual-bridge{position:absolute;background:repeating-linear-gradient(90deg,#9b5f31 0 22px,#d0954c 23px 46px);border:5px solid #56371f;box-sizing:border-box;box-shadow:0 8px rgba(41,55,32,.3);z-index:14}
+.visual-bridge::before,.visual-bridge::after{content:'';position:absolute;left:-5px;right:-5px;height:5px;background:#4d321f}.visual-bridge::before{top:5px}.visual-bridge::after{bottom:5px}
+
+.visual-garden{position:absolute;left:756px;top:190px;width:184px;height:102px;border:5px solid #6b4728;background:rgba(94,136,58,.72);box-shadow:inset 0 0 0 5px rgba(174,201,92,.24)}
+.visual-garden>i{position:absolute;width:22px;height:22px;background:radial-gradient(circle,#efcc65 0 4px,#ed98af 5px 9px,transparent 10px);filter:drop-shadow(0 5px 0 #4a7337)}
+.visual-garden>i:nth-child(1){left:16px;top:18px}.visual-garden>i:nth-child(2){left:50px;top:52px}.visual-garden>i:nth-child(3){left:83px;top:17px}.visual-garden>i:nth-child(4){left:116px;top:51px}.visual-garden>i:nth-child(5){left:146px;top:19px}
+.visual-fence{position:absolute;height:18px;background:repeating-linear-gradient(90deg,#8f5a30 0 8px,#c18745 9px 15px,#4f321f 16px 19px);border-top:4px solid #53331f;border-bottom:4px solid #53331f}
+.visual-fence--farm{left:73px;top:699px;width:234px}.visual-fence--animals{left:852px;top:420px;width:230px}
+.visual-sign{position:absolute;width:54px;height:34px;background:#9b683b;border:4px solid #4d311f;box-shadow:inset 0 5px #c39156}
+.visual-sign::after{content:'';position:absolute;left:20px;bottom:-30px;width:9px;height:28px;background:#5c3c25}
+.visual-sign--community{left:390px;top:246px}
+.visual-mailbox{position:absolute;left:446px;top:318px;width:27px;height:26px;background:#a34f3e;border:4px solid #542b27;border-radius:8px 8px 0 0}
+.visual-mailbox::after{content:'';position:absolute;left:8px;bottom:-34px;width:7px;height:32px;background:#533522}
+
+.visual-tree{position:absolute;z-index:6;width:64px;height:86px;filter:drop-shadow(7px 8px 0 rgba(38,50,29,.25))}
+.visual-tree::before{content:'';position:absolute;left:25px;bottom:0;width:18px;height:38px;background:#79502c;border:4px solid #4a321f;box-shadow:inset -5px 0 #5c3b26}
+.visual-tree::after{content:'';position:absolute;left:1px;top:4px;width:66px;height:61px;background:radial-gradient(circle at 37% 30%,#8fbd45 0 15px,transparent 16px),radial-gradient(circle at 68% 33%,#6fa13e 0 20px,transparent 21px),radial-gradient(circle at 52% 68%,#4d8738 0 26px,transparent 27px);filter:drop-shadow(0 4px 0 #315d31)}
+.visual-tree>i{position:absolute;z-index:2;left:13px;top:13px;width:11px;height:11px;background:#bad65f;box-shadow:28px 7px #98c34f,16px 29px #6fa83f}
+.visual-tree--medium{transform:scale(.82);transform-origin:50% 100%}.visual-tree--large{transform:scale(1.04);transform-origin:50% 100%}
+.visual-flower-cluster{position:absolute;z-index:5;width:44px;height:31px;background:radial-gradient(circle at 15% 63%,#ef9db5 0 5px,transparent 6px),radial-gradient(circle at 45% 30%,#f2cc6a 0 5px,transparent 6px),radial-gradient(circle at 76% 62%,#d6a7df 0 5px,transparent 6px);filter:drop-shadow(0 7px 0 #4b7937)}
+.visual-flower-cluster--yellow{filter:hue-rotate(-24deg) drop-shadow(0 7px 0 #4b7937)}.visual-flower-cluster--purple{filter:hue-rotate(45deg) drop-shadow(0 7px 0 #4b7937)}
+
+.persistent-world-objects{z-index:8}
+.persistent-object{border-width:3px;filter:drop-shadow(4px 5px 0 rgba(34,42,25,.3))}
+.world-object-label{position:absolute;z-index:20;left:50%;bottom:calc(100% + 9px);padding:5px 7px;color:#fff5dc;background:rgba(45,29,21,.92);border:2px solid #241914;box-shadow:3px 3px rgba(21,26,16,.25);font:8px var(--font-pixel);line-height:1;white-space:nowrap;transform:translateX(calc(-50% + var(--label-offset,0px)));opacity:.95}
+.asset-plaza{width:82px;height:48px;border:5px solid #4b3a2e;border-radius:50%;background:#4ea5b5;box-shadow:inset 0 9px #8fd6d4,inset 0 -8px #2d7180,0 7px 0 rgba(52,52,33,.3)}
+.asset-plaza::before{left:29px;top:-49px;width:20px;height:51px;background:#8a8170;border:4px solid #4b443a;box-shadow:inset 5px 4px #b9b2a0}
+.asset-plaza::after{content:'';position:absolute;left:36px;top:-67px;width:10px;height:24px;background:#a69e8a;border:4px solid #4b443a;border-radius:8px 8px 2px 2px}
+.asset-plaza>i{left:11px;right:11px;bottom:6px;height:8px;background:rgba(204,245,235,.65);border-radius:50%}
+.asset-community_house{width:var(--community-house-width);height:calc(var(--community-house-height) / 2);transform:translate(calc(-1 * var(--community-house-offset-x)),-100%);background:#c58a51;border:6px solid #513323;box-sizing:border-box;box-shadow:inset 0 -21px #925a35,inset 0 8px #e2b874,9px 10px rgba(35,41,25,.36)}
+.asset-community_house::before{left:-6px;right:-6px;top:calc(-1 * var(--community-house-height) / 2);height:calc(var(--community-house-height) / 2 + 6px);background:linear-gradient(135deg,#753d34 0 48%,#9b5641 49% 100%);border:6px solid #402820;box-sizing:border-box;clip-path:polygon(50% 0,100% 100%,0 100%);box-shadow:inset 0 -11px rgba(62,38,28,.32)}
+.asset-community_house::after{left:calc(50% - 15px);bottom:0;width:30px;height:55px;background:#65402c;border:5px solid #3b291f;box-sizing:border-box;box-shadow:inset 6px 0 #8c613a}
+.asset-community_house>i{left:18px;top:25px;width:25px;height:27px;background:#f0c867;border:5px solid #5a3a27;box-shadow:91px 0 #f0c867,91px 0 0 5px #5a3a27,inset 6px 6px #fff0a4}
+
+.asset-default_npc_guide,.asset-default_npc_gardener,.asset-default_npc_memory_keeper,.asset-default_npc_animal_caretaker{width:32px;height:46px;border:4px solid #3b271e;border-radius:5px;background:#b85742;box-shadow:inset -7px -8px #84372e,0 8px 0 -4px rgba(31,38,22,.4)}
+.is-world-npc::before{left:3px;top:-24px;width:22px;height:23px;background:#dca177;border:4px solid #4b3023;border-radius:7px;box-shadow:inset 0 -5px #bf805e}
+.is-world-npc::after{content:'';position:absolute;left:2px;bottom:-11px;width:10px;height:13px;background:#4a4037;border:3px solid #2b241f;box-shadow:17px 0 #4a4037}
+.is-world-npc>i{left:2px;top:-27px;width:28px;height:12px;background:#523628;border:4px solid #33231c;box-shadow:inset -5px -3px #3e281f}
+.asset-default_npc_guide{background:#b94e3f}.asset-default_npc_guide>i{background:#d8a64f;clip-path:polygon(0 100%,12% 0,88% 0,100% 100%)}
+.asset-default_npc_gardener{background:#497d55;box-shadow:inset -7px -8px #315f42,0 8px 0 -4px rgba(31,38,22,.4)}.asset-default_npc_gardener>i{background:#658e3d;border-radius:50% 50% 0 0}
+.asset-default_npc_memory_keeper{background:#725d91;box-shadow:inset -7px -8px #51446d,0 8px 0 -4px rgba(31,38,22,.4)}.asset-default_npc_memory_keeper>i{background:#3e304f;box-shadow:inset 5px 0 #8972aa}
+.asset-default_npc_animal_caretaker{background:#3f7892;box-shadow:inset -7px -8px #2d586d,0 8px 0 -4px rgba(31,38,22,.4)}.asset-default_npc_animal_caretaker>i{background:#98603c;border-radius:50% 50% 0 0}
+
+.asset-default_dog{width:39px;height:24px;background:#bd7e43;border:4px solid #493023;border-radius:45% 48% 34% 38%;box-shadow:none}
+.asset-default_dog::before{left:-12px;top:-12px;width:21px;height:23px;background:#c78c50;border:4px solid #493023;border-radius:45%}
+.asset-default_dog::after{right:-14px;top:-6px;width:17px;height:7px;background:#8d572f;border:3px solid #493023;transform:rotate(-42deg)}
+.asset-default_dog>i{left:-8px;top:-18px;width:9px;height:13px;background:#70442b;border:3px solid #493023;box-shadow:9px 0 #70442b}
+.asset-default_cat{width:34px;height:25px;background:#d4a56c;border:4px solid #493023;border-radius:48% 48% 35% 35%;clip-path:none}
+.asset-default_cat::before{left:-9px;top:-15px;width:21px;height:22px;background:#d4a56c;border:4px solid #493023;clip-path:polygon(0 0,33% 25%,67% 25%,100% 0,91% 100%,9% 100%)}
+.asset-default_cat::after{right:-16px;top:-12px;width:20px;height:20px;background:transparent;border:5px solid #b77d4d;border-left:0;border-bottom:0;border-radius:50%;transform:none}
+.asset-default_cat>i{left:-2px;top:-7px;width:4px;height:4px;background:#2b211b;box-shadow:8px 0 #2b211b}
+.asset-default_bird{width:27px;height:20px;background:#4e8fc4;border:4px solid #283e56;border-radius:55% 48% 48% 55%;box-shadow:none}
+.asset-default_bird::before{left:6px;top:3px;width:17px;height:12px;background:#75b4d6;clip-path:polygon(0 50%,100% 0,72% 100%)}
+.asset-default_bird::after{right:-12px;top:3px;border-left:12px solid #e5a844;border-top:5px solid transparent;border-bottom:5px solid transparent}
+.asset-default_bird>i{left:4px;top:-10px;width:13px;height:12px;background:#4e8fc4;border:4px solid #283e56;border-radius:50%}
+
+.asset-farm_carrot,.asset-farm_flower,.asset-farm_tomato,.asset-farm_cabbage{filter:drop-shadow(0 5px 0 rgba(37,57,28,.28))}
+.asset-farm_carrot{transform:translate(-50%,-100%) scale(1.25)}
+.asset-farm_flower{transform:translate(-50%,-100%) scale(1.3)}
+.asset-farm_tomato,.asset-farm_cabbage{transform:translate(-50%,-100%) scale(1.22)}
+.asset-farm_plot_empty{opacity:.01;width:48px;height:48px}
+
+@media (min-width:900px) and (min-height:700px){
+  .weather-panel{left:20px;top:18px;min-width:166px;padding:10px 13px;background:rgba(48,29,20,.9);border:3px solid #6d4429}
+  .weather-panel__sun{width:34px;height:34px;font-size:19px}.weather-panel strong{font-size:12px}.weather-panel small{display:block;font-size:10px}
+  .village-status{left:50%;top:20px;bottom:auto;min-width:360px;max-width:520px;justify-content:center;padding:13px 18px;background:rgba(49,29,20,.9);border:3px solid #a26b37;transform:translateX(-50%)}
+  .village-action-bar{right:72px;top:18px;bottom:auto}.village-action-bar .capture-icon-button{width:44px;height:44px;min-height:44px}
+  .village-menu-button{right:18px;top:18px;width:44px;height:44px;background:rgba(49,29,20,.9);border:3px solid #5e3a26}
+  .virtual-joystick{opacity:.16}
+}
+.village-history-card{position:absolute;z-index:var(--layer-hud);right:18px;bottom:18px;width:230px;padding:13px 15px;color:#fff3db;background:rgba(48,29,20,.9);border:3px solid #69422a;box-shadow:4px 4px rgba(19,24,14,.32);pointer-events:none}
+.village-history-card h2{margin:0 0 9px;color:#f0c878;font:9px var(--font-pixel)}
+.village-history-card ol{display:grid;gap:7px;margin:0;padding:0;list-style:none}.village-history-card li{display:grid;gap:3px;padding-top:7px;border-top:1px solid rgba(240,200,120,.2)}.village-history-card li:first-child{padding-top:0;border-top:0}
+.village-history-card li span,.village-history-card p{margin:0;color:#f5ead6;font-size:11px;line-height:1.45}.village-history-card time{color:#c5a988;font-size:9px}
+
+@media (max-width:899px), (max-height:699px){
+  .world-object-label{display:none}
+  .village-history-card{display:none}
+}
+@media (max-width:899px){
+  .virtual-joystick{display:block!important}
+  .virtual-joystick::after{
+    content:'';
+    position:fixed;
+    left:22px;
+    bottom:calc(22px + env(safe-area-inset-bottom,0px));
+    width:82px;
+    height:82px;
+    border:3px solid rgba(242,200,121,.4);
+    background:radial-gradient(circle,rgba(242,200,121,.28) 0 18%,rgba(58,36,24,.34) 20% 58%,rgba(24,28,20,.28) 60%);
+    box-shadow:inset 0 0 0 4px rgba(42,32,24,.22),3px 4px rgba(20,25,18,.24);
+    pointer-events:none;
+    opacity:.62;
+  }
+  .virtual-joystick.is-active::after{opacity:0}
+  .tile-inspect-panel{left:14px;right:14px;width:auto;box-sizing:border-box}
+}
+@media (max-width:760px){
+  .village-visual-decor{overflow:visible}
+  .visual-tree{filter:drop-shadow(5px 6px 0 rgba(38,50,29,.23))}
+  .asset-community_house{width:var(--community-house-width);height:calc(var(--community-house-height) / 2)}
+  .asset-plaza{width:74px;height:44px}
+  .asset-default_npc_guide,.asset-default_npc_gardener,.asset-default_npc_memory_keeper,.asset-default_npc_animal_caretaker{transform:translate(-50%,-100%) scale(1.08)}
+  .asset-default_dog,.asset-default_cat,.asset-default_bird{transform:translate(-50%,-100%) scale(1.12)}
+}
+.village-world{
+  left:max(0px,calc((100vw - var(--camera-world-width,1267.2px)) / 2));
+  top:max(0px,calc((100dvh - var(--camera-world-height,844.8px)) / 2));
+  width:var(--world-width,1152px);
+  height:var(--world-height,768px);
+  transform-origin:0 0;
+  transform:translate3d(
+    clamp(
+      min(0px,calc(100vw - var(--camera-world-width,1267.2px))),
+      calc(var(--camera-anchor-x) - var(--camera-character-x,0px) - max(0px,calc((100vw - var(--camera-world-width,1267.2px)) / 2))),
+      0px
+    ),
+    clamp(
+      min(0px,calc(100dvh - var(--camera-world-height,844.8px))),
+      calc(var(--camera-anchor-y) - var(--camera-character-y,0px) - max(0px,calc((100dvh - var(--camera-world-height,844.8px)) / 2))),
+      0px
+    ),
+    0
+  ) scale(var(--camera-zoom,1.1));
+  will-change:transform;
+}
+.world-coordinate-layer{position:absolute;inset:0;z-index:2;transform:translate3d(var(--world-origin-x,0px),var(--world-origin-y,0px),0);overflow:visible;pointer-events:none}
+.world-coordinate-layer .tile-interactions{pointer-events:auto}
+.region-decorations{position:absolute;inset:0;z-index:7;pointer-events:none}
+.region-decoration{position:absolute;width:18px;height:18px;transform:translate(-50%,-100%);image-rendering:pixelated}
+.region-meadow{background:#f2c879;border:2px solid #6d7439;border-radius:50%;box-shadow:-7px 5px 0 -3px #ec9aaa,7px 4px 0 -3px #f0ddb4}
+.region-forest{width:32px;height:42px;background:#3f7438;border:3px solid #274b2b;border-radius:48% 48% 35% 35%;box-shadow:inset -7px -5px #31552e,0 8px 0 -5px #765035}
+.region-pond{background:#65aeb2;border:2px solid #285d68;border-radius:50%;box-shadow:6px 2px 0 -3px #7ca84d}
+.region-discovery-banner{position:fixed;z-index:var(--layer-toast);left:50%;top:calc(env(safe-area-inset-top,0px) + 92px);transform:translateX(-50%);padding:12px 18px;color:#fff4dd;background:rgba(58,36,24,.94);border:3px solid #d9a95d;box-shadow:5px 6px rgba(18,22,16,.35);font:700 10px var(--font-pixel);white-space:nowrap;animation:region-discovery-in 2.2s ease both}
+@keyframes region-discovery-in{0%{opacity:0;transform:translate(-50%,-10px)}15%,80%{opacity:1;transform:translate(-50%,0)}100%{opacity:0;transform:translate(-50%,-5px)}}
+@media(prefers-reduced-motion:reduce){.region-discovery-banner{animation:none}}
 .tile-inspect-panel__farm{margin-top:14px;padding-top:12px;border-top:1px solid rgba(242,200,121,.2)}.tile-inspect-panel__farm p{font-size:11px;line-height:1.6;color:var(--text-muted)}.tile-inspect-panel__farm button{min-height:40px;padding:8px 11px;color:#39281e;background:#f0ddb4;border:2px solid #4b3528;box-shadow:2px 2px rgba(18,22,16,.28);font:800 9px var(--font-pixel);cursor:pointer}
+
+/* Project Eden village art direction.
+   Runtime coordinates, hitboxes and server-authored objects remain untouched;
+   these final overrides establish the warm 16-bit/pixel-parchment presentation. */
+.village-stage{
+  isolation:isolate;
+  background:
+    linear-gradient(180deg,rgba(31,19,34,.08),rgba(28,34,20,.2)),
+    url('/art/eden-village-sunset-v1.jpg') center/cover no-repeat,
+    #2f253c;
+  image-rendering:pixelated;
+}
+.village-stage::before{
+  content:'';
+  position:absolute;
+  z-index:0;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(90deg,rgba(25,16,13,.38),transparent 12%,transparent 88%,rgba(25,16,13,.38)),
+    linear-gradient(180deg,rgba(28,16,14,.2),transparent 24%,transparent 78%,rgba(24,17,12,.28));
+}
+.village-scene{z-index:1;background:transparent}
+.village-world{
+  background:#5f9146;
+  outline:3px solid #d6a45b;
+  outline-offset:6px;
+  border:5px solid #3a2419;
+  border-radius:2px;
+  box-shadow:
+    0 0 0 10px #684126,
+    0 0 0 13px #2a1a14,
+    0 20px 52px rgba(16,11,9,.64),
+    inset 0 0 42px rgba(30,50,22,.2);
+}
+.grass-tiles{
+  background-color:#5f9146;
+  background-image:
+    url('/art/eden-village-hub-v1.jpg'),
+    linear-gradient(90deg,rgba(43,91,39,.11) 1px,transparent 1px),
+    linear-gradient(rgba(43,91,39,.1) 1px,transparent 1px),
+    radial-gradient(circle at 15% 25%,#85ad50 0 2px,transparent 3px),
+    radial-gradient(circle at 78% 69%,#3d7138 0 2px,transparent 3px),
+    radial-gradient(circle at 56% 38%,rgba(236,203,105,.18) 0 1px,transparent 2px);
+  background-size:1152px 768px,48px 48px,48px 48px,31px 27px,43px 39px,61px 53px;
+  background-position:var(--world-origin-x,0px) var(--world-origin-y,0px),0 0,0 0,0 0,0 0,0 0;
+  background-repeat:no-repeat,repeat,repeat,repeat,repeat,repeat;
+}
+.persistent-terrain{opacity:.22;mix-blend-mode:multiply}
+.terrain-tile{image-rendering:pixelated}
+.terrain-road{
+  background:
+    radial-gradient(circle at 24% 32%,#e9c879 0 2px,transparent 3px),
+    radial-gradient(circle at 72% 71%,#9d6638 0 2px,transparent 3px),
+    linear-gradient(90deg,#c68f4f,#d5a45f 48%,#be8448);
+  box-shadow:inset 4px 0 rgba(247,215,137,.25),inset -4px 0 rgba(104,64,34,.2);
+}
+.terrain-water{
+  background:
+    repeating-linear-gradient(170deg,transparent 0 13px,rgba(167,231,222,.24) 14px 17px,transparent 18px 31px),
+    linear-gradient(180deg,#46acc0,#287f9a);
+  box-shadow:inset 0 6px rgba(186,239,226,.28),inset 0 -5px rgba(22,89,117,.25);
+}
+.terrain-soil{
+  background:
+    repeating-linear-gradient(90deg,transparent 0 8px,rgba(68,38,24,.42) 9px 13px,transparent 14px 24px),
+    linear-gradient(#996139,#774428);
+  box-shadow:inset 0 4px rgba(229,161,83,.28),inset 0 -4px rgba(63,35,22,.28);
+}
+.visual-path,.visual-farm,.visual-pond,.visual-plaza,.visual-tree,.persistent-object{
+  image-rendering:pixelated;
+  filter:saturate(1.08) contrast(1.04) drop-shadow(4px 6px 0 rgba(32,38,23,.22));
+}
+.hub-decoration{display:none}
+.visual-path{border-color:#704525;background:#cb9450}
+.visual-plaza{border-color:#7f502d;background:radial-gradient(ellipse at center,#ddbd73 0 48%,#c18c4b 49% 68%,#956032 69% 100%)}
+.visual-pond{border-color:#294f3c;background:radial-gradient(ellipse at 56% 38%,#63c1c8 0 14%,#2e9bb3 46%,#1c718b 100%)}
+.visual-tree::after{filter:drop-shadow(0 4px 0 #274c2a) saturate(1.12)}
+.visual-farm>b,.world-object-label{
+  color:#fff4d8;
+  background:linear-gradient(#38251c,#211711);
+  border-color:#160f0c;
+  box-shadow:inset 0 1px rgba(255,225,166,.16),3px 3px rgba(20,16,11,.38);
+}
+.asset-community_house{
+  filter:saturate(1.08) drop-shadow(9px 11px 0 rgba(31,35,22,.34));
+  box-shadow:inset 0 -21px #86502e,inset 0 8px #e1b26d,9px 10px rgba(35,41,25,.36);
+}
+.asset-community_house::before{background:linear-gradient(135deg,#6c362d 0 48%,#a45b40 49% 100%)}
+.asset-community_house>i{background:#ffd477;box-shadow:91px 0 #ffd477,91px 0 0 5px #5a3a27,inset 6px 6px #fff4b2}
+.weather-panel,.village-status,.village-menu-button,.village-action-bar .capture-icon-button,.village-history-card{
+  color:#fff4da;
+  background:
+    linear-gradient(180deg,rgba(77,47,30,.98),rgba(39,25,19,.98));
+  border-color:#2a1912;
+  outline:2px solid #a66d36;
+  outline-offset:-5px;
+  box-shadow:inset 0 2px rgba(244,193,102,.2),4px 5px rgba(18,12,10,.42);
+}
+.weather-panel__sun{
+  color:#3b2618;
+  background:#e8b54e;
+  border-color:#4a2d1b;
+  box-shadow:inset 3px 3px #ffd76f,2px 2px #1e1410;
+}
+.weather-panel strong{color:#fff4dc;letter-spacing:.02em}
+.weather-panel small{color:#e4c79c}
+.village-status{border-left:3px solid #d8a95b}
+.village-status span{color:#f4c96e}
+.village-menu-button,.village-action-bar .capture-icon-button{color:#fff1d0}
+.village-history-card h2{color:#f4c96e;text-align:center;letter-spacing:.05em}
+.village-history-card li span,.village-history-card p{color:#f6e6c8}
+.tile-inspect-panel,.npc-dialogue-panel,.contextual-interaction-panel{
+  color:#38251b;
+  background:
+    linear-gradient(rgba(255,248,224,.88),rgba(239,216,170,.96)),
+    repeating-linear-gradient(0deg,rgba(126,83,45,.04) 0 1px,transparent 1px 4px);
+  border:4px solid #432a1d;
+  outline:2px solid #c28a45;
+  outline-offset:-7px;
+  box-shadow:6px 7px rgba(19,14,11,.42);
+}
+.tile-inspect-panel h2,.tile-inspect-panel h3,.npc-dialogue-panel h2,.contextual-interaction-panel__title{color:#5d351f}
+.tile-inspect-panel button,.npc-dialogue-panel button,.contextual-interaction-panel button{
+  color:#fff1d0;
+  background:linear-gradient(#8c5731,#5b351f);
+  border-color:#2e1d16;
+  box-shadow:inset 0 2px rgba(255,212,131,.22),2px 3px rgba(41,26,18,.25);
+}
+.scene-vignette{
+  box-shadow:inset 0 0 76px rgba(24,17,12,.42),inset 0 0 0 2px rgba(242,190,99,.14);
+}
+@media (min-width:900px) and (min-height:700px){
+  .village-scene{background:transparent}
+  .weather-panel{min-width:240px}
+  .village-status{min-width:430px}
+  .village-history-card{width:250px}
+}
+@media (max-width:899px), (max-height:699px){
+  .village-world{outline-width:2px;outline-offset:3px;border-width:3px;box-shadow:0 0 0 5px #684126,0 0 0 7px #2a1a14,0 12px 28px rgba(16,11,9,.55)}
+  .weather-panel,.village-status,.village-menu-button,.village-action-bar .capture-icon-button{outline-width:1px;outline-offset:-4px}
+}
+@media (prefers-reduced-motion:reduce){
+  .visual-path,.visual-farm,.visual-pond,.visual-plaza,.visual-tree,.persistent-object{filter:saturate(1.06) contrast(1.03)}
+}
 
 /* Village MVP Polish 2-B2: one server-selected, screen-space interaction prompt. */
 .village-interaction-prompt{max-width:min(260px,calc(100vw - 156px))}
@@ -502,6 +900,23 @@ body{overscroll-behavior:none;background:var(--forest-deep)}
    session. Keep its controls above the touch HUD and inside the safe area. */
 .template-npc-dialogue-panel .npc-dialogue-panel__copy h2{margin:0;color:#7d422f;font-family:var(--font-serif);font-size:21px;font-weight:600}
 .template-npc-dialogue-panel .npc-dialogue-panel__copy p{display:block;-webkit-line-clamp:unset;overflow:visible}
+.npc-relationship{display:grid;gap:7px;margin-top:10px;padding-top:9px;border-top:2px solid rgba(75,53,40,.28);font-family:var(--font-pixel)}
+.npc-relationship__affinity{display:flex;align-items:center;justify-content:space-between;gap:10px;color:#7d422f;font-size:9px}
+.npc-relationship__affinity span{color:#a33e4f}
+.npc-relationship__meter{height:6px;overflow:hidden;background:rgba(75,53,40,.2);border:1px solid rgba(75,53,40,.45)}
+.npc-relationship__meter i{display:block;height:100%;background:#d75a6f;transition:width .2s ease}
+.npc-relationship h3,.npc-relationship summary{margin:3px 0;color:#654534;font-size:8px}
+.npc-relationship summary{cursor:pointer}
+.npc-relationship ul{display:grid;gap:4px;margin:4px 0 0;padding:0;list-style:none}
+.npc-relationship li{display:flex;justify-content:space-between;gap:8px;color:#493329;font-size:8px}
+.npc-relationship li small{margin:0;color:#846b54;font-size:7px}
+.npc-progress-toast{position:fixed;z-index:var(--layer-toast);left:50%;top:calc(env(safe-area-inset-top,0px) + 88px);max-width:min(520px,calc(100vw - 32px));padding:11px 15px;color:#fff4dd;background:rgba(91,55,37,.94);border:3px solid #d9a95d;box-shadow:4px 5px rgba(18,22,16,.3);font:700 9px/1.55 var(--font-pixel);text-align:center;transform:translateX(-50%);animation:toast-in .2s ease both}
+@media (max-width:760px){
+  .npc-relationship__affinity{font-size:8px}
+  .npc-relationship li{font-size:7px}
+  .npc-relationship summary,.npc-relationship li{min-height:44px;align-items:center}
+  .npc-progress-toast{top:calc(env(safe-area-inset-top,0px) + 70px);font-size:8px}
+}
 .community-history-summary{margin-top:12px;padding-top:10px;border-top:1px solid rgba(125,66,47,.16)}
 .community-history-summary h3{margin:0 0 8px;color:#7d422f;font-family:var(--font-serif);font-size:16px;font-weight:600}
 .community-history-summary ol{display:grid;gap:7px;margin:0;padding:0;list-style:none}
@@ -518,4 +933,107 @@ body{overscroll-behavior:none;background:var(--forest-deep)}
 @media (max-width:430px){
   .community-history-summary li{grid-template-columns:minmax(0,1fr)}
   .community-history-summary time{justify-self:start}
+}
+
+/* Phase 4-A1: the outer object owns authoritative tile translation while the
+   inner sprite keeps its existing walk/bob animation transform. */
+.persistent-object.is-world-npc{transition:left 180ms linear,top 180ms linear}
+.world-npc-activity{position:absolute;left:50%;top:calc(100% + 3px);padding:2px 4px;color:#fff;background:rgba(33,25,20,.78);font:5px var(--font-pixel);white-space:nowrap;transform:translateX(-50%)}
+.template-npc-dialogue-panel .npc-dialogue-panel__copy h2 small{display:inline-block;margin-left:8px;color:#876c4d;font:6px var(--font-pixel)}
+.template-npc-dialogue-panel .npc-dialogue-panel__actions button{min-height:44px}
+@media (prefers-reduced-motion:reduce){.persistent-object.is-world-npc{transition:none}}
+
+/* Mobile village scale correction.
+   The hub artwork already contains its centered fountain, paths, farms and pond.
+   Persistent records remain in the DOM for interaction/state, while runtime
+   sprites use the same compact pixel scale as the painted 48px terrain tiles. */
+.asset-plaza{
+  opacity:0;
+  filter:none;
+}
+.asset-community_house{
+  border-width:4px;
+  box-shadow:inset 0 -14px #925a35,inset 0 5px #e2b874,5px 6px rgba(35,41,25,.3);
+}
+.asset-community_house::before{
+  left:-4px;
+  right:-4px;
+  border-width:4px;
+}
+.asset-community_house::after{
+  left:calc(50% - 10px);
+  width:20px;
+  height:38px;
+  border-width:3px;
+}
+.asset-community_house>i{
+  left:12px;
+  top:17px;
+  width:17px;
+  height:18px;
+  border-width:3px;
+  box-shadow:55px 0 #ffd477,55px 0 0 3px #5a3a27,inset 4px 4px #fff4b2;
+}
+.asset-default_npc_guide,.asset-default_npc_gardener,.asset-default_npc_memory_keeper,.asset-default_npc_animal_caretaker{
+  width:22px;
+  height:30px;
+  border-width:3px;
+  box-shadow:inset -4px -5px #84372e,0 5px 0 -3px rgba(31,38,22,.34);
+}
+.asset-default_npc_gardener{box-shadow:inset -4px -5px #315f42,0 5px 0 -3px rgba(31,38,22,.34)}
+.asset-default_npc_memory_keeper{box-shadow:inset -4px -5px #51446d,0 5px 0 -3px rgba(31,38,22,.34)}
+.asset-default_npc_animal_caretaker{box-shadow:inset -4px -5px #2d586d,0 5px 0 -3px rgba(31,38,22,.34)}
+.is-world-npc::before{
+  left:2px;
+  top:-17px;
+  width:14px;
+  height:15px;
+  border-width:3px;
+}
+.is-world-npc::after{
+  left:1px;
+  bottom:-8px;
+  width:7px;
+  height:9px;
+  border-width:2px;
+  box-shadow:11px 0 #4a4037;
+}
+.is-world-npc>i{
+  left:1px;
+  top:-19px;
+  width:19px;
+  height:8px;
+  border-width:3px;
+}
+.asset-default_dog{width:25px;height:16px;border-width:3px}
+.asset-default_dog::before{left:-8px;top:-8px;width:14px;height:15px;border-width:3px}
+.asset-default_dog::after{right:-10px;top:-4px;width:11px;height:5px;border-width:2px}
+.asset-default_dog>i{left:-5px;top:-12px;width:6px;height:9px;border-width:2px;box-shadow:6px 0 #70442b}
+.asset-default_cat{width:23px;height:17px;border-width:3px}
+.asset-default_cat::before{left:-6px;top:-10px;width:14px;height:15px;border-width:3px}
+.asset-default_cat::after{right:-10px;top:-8px;width:13px;height:13px;border-width:3px}
+.asset-default_cat>i{left:-1px;top:-5px;width:3px;height:3px;box-shadow:6px 0 #2b211b}
+.asset-default_bird{width:19px;height:14px;border-width:3px}
+.asset-default_bird::before{left:4px;top:2px;width:12px;height:8px}
+.asset-default_bird::after{right:-8px;top:2px;border-left-width:8px;border-top-width:4px;border-bottom-width:4px}
+.asset-default_bird>i{left:3px;top:-7px;width:9px;height:8px;border-width:3px}
+.pixel-character{transform:translate3d(-50%,-100%,0) scale(.88)}
+
+@media (max-width:760px){
+  html,body,#root,.app-shell,.village-page,.village-stage,.village-scene{
+    width:100%;
+    max-width:100vw;
+    height:100svh;
+    min-height:100svh;
+    overflow:hidden;
+  }
+  @supports (height:100dvh){
+    html,body,#root,.app-shell,.village-page,.village-stage,.village-scene{height:100dvh;min-height:100dvh}
+  }
+  .village-world{border-width:2px;outline-width:1px;outline-offset:2px}
+  .pixel-character{transform:translate3d(-50%,-100%,0) scale(.78)}
+  .asset-default_npc_guide,.asset-default_npc_gardener,.asset-default_npc_memory_keeper,.asset-default_npc_animal_caretaker,
+  .asset-default_dog,.asset-default_cat,.asset-default_bird{
+    transform:translate(-50%,-100%);
+  }
 }

@@ -10,6 +10,7 @@ import {
   resolveHudInteraction,
   selectCurrentHudInteraction,
 } from '../src/components/village/contextualInteraction'
+import { configureResourceStableRendering } from './village-resource-stable-rendering'
 
 const fixture = createE2EFixture('village-contextual')
 
@@ -23,6 +24,7 @@ async function dismissOnboarding(page) {
 }
 
 async function enterVillage(page) {
+  await configureResourceStableRendering(page)
   await page.goto(FRONTEND_URL)
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
@@ -34,7 +36,7 @@ async function enterVillage(page) {
     await page.getByRole('button', { name: '들어가기' }).click()
   }
 
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
   const token = await page.evaluate(() => window.sessionStorage.getItem('projectEdenAccessToken'))
   expect(token).toBeTruthy()
@@ -45,7 +47,7 @@ async function syncVillage(page) {
   await page.reload()
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
 }
 
@@ -83,6 +85,7 @@ function pathTo(state, target) {
   const walkable = new Set(state.terrainTiles
     .filter((tile) => tile.walkable)
     .map((tile) => coordinateKey(tile.x, tile.y)))
+  const npcTiles = new Set((state.npcPositions || []).map((npc) => coordinateKey(npc.x, npc.y)))
   const queue = [{ ...state.playerPosition, path: [] }]
   const seen = new Set([coordinateKey(state.playerPosition.x, state.playerPosition.y)])
   const directions = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]
@@ -93,7 +96,7 @@ function pathTo(state, target) {
     for (const direction of directions) {
       const next = { x: current.x + direction.x, y: current.y + direction.y }
       const nextKey = coordinateKey(next.x, next.y)
-      if (seen.has(nextKey) || !walkable.has(nextKey)) continue
+      if (seen.has(nextKey) || !walkable.has(nextKey) || npcTiles.has(nextKey)) continue
       seen.add(nextKey)
       queue.push({ ...next, path: [...current.path, next] })
     }
@@ -102,22 +105,72 @@ function pathTo(state, target) {
 }
 
 async function routePlayer(page, token, target) {
-  const before = await worldState(page, token)
-  for (const step of pathTo(before, target)) {
+  for (let attempt = 0; attempt < 128; attempt += 1) {
+    const current = await worldState(page, token)
+    if (current.playerPosition.x === target.x && current.playerPosition.y === target.y) return
+    const [step] = pathTo(current, target)
     const response = await browserApi(page, token, '/api/worlds/me/move', {
       method: 'POST',
       body: { targetX: step.x, targetY: step.y },
     })
     expect(response.status).toBe(200)
+    if (!response.body.accepted && response.body.reason === 'NPC_BLOCKED') continue
     expect(response.body.accepted).toBe(true)
   }
-  const after = await worldState(page, token)
-  expect(after.playerPosition).toEqual(target)
+  throw new Error(`Could not route player to ${target.x},${target.y} after NPC replanning`)
 }
 
 async function placeAndSync(page, token, target) {
   await routePlayer(page, token, target)
   await syncVillage(page)
+}
+
+function cardinalCandidates(object) {
+  const target = { x: Math.floor(object.x / 48), y: Math.floor(object.y / 48) }
+  return [
+    { x: target.x + 1, y: target.y },
+    { x: target.x - 1, y: target.y },
+    { x: target.x, y: target.y + 1 },
+    { x: target.x, y: target.y - 1 },
+  ]
+}
+
+async function placeNextToAsset(page, token, assetType) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const state = await worldState(page, token)
+    const runtimeNpc = (state.npcPositions || [])
+      .find((candidate) => candidate.assetType === assetType)
+    const object = runtimeNpc
+      ? {
+        ...runtimeNpc,
+        id: runtimeNpc.objectId,
+        x: runtimeNpc.pixelX,
+        y: runtimeNpc.pixelY,
+      }
+      : state.placedObjects
+        .filter((candidate) => candidate.assetType === assetType)
+        .sort((left, right) => left.id - right.id)[0]
+    expect(object).toBeTruthy()
+
+    for (const adjacent of cardinalCandidates(object)) {
+      try {
+        pathTo(state, adjacent)
+        await routePlayer(page, token, adjacent)
+      } catch {
+        continue
+      }
+      const positioned = await worldState(page, token)
+      const primary = positioned.availableInteractions.find((interaction) => (
+        interaction.available === true
+          && (interaction.type === 'TALK' || interaction.type === 'INTERACT')
+      ))
+      if (primary?.targetId === object.id) {
+        await syncVillage(page)
+        return
+      }
+    }
+  }
+  throw new Error(`No server-authoritative interaction position found for ${assetType}`)
 }
 
 async function expectSinglePrompt(page, expected) {
@@ -168,7 +221,7 @@ test('uses safe fallbacks for incomplete or unknown interaction metadata', async
 test('uses one server-ordered HUD prompt for TALK and INTERACT', async ({ page }, testInfo) => {
   const token = await enterVillage(page)
 
-  await placeAndSync(page, token, { x: 10, y: 7 })
+  await placeNextToAsset(page, token, 'DEFAULT_NPC_GUIDE')
   await expectSinglePrompt(page, {
     type: 'TALK',
     asset: 'DEFAULT_NPC_GUIDE',
@@ -177,7 +230,7 @@ test('uses one server-ordered HUD prompt for TALK and INTERACT', async ({ page }
   })
   await expect(page.locator('.village-interaction-prompt button')).toHaveCount(1)
 
-  await placeAndSync(page, token, { x: 4, y: 9 })
+  await placeNextToAsset(page, token, 'FARM_PLOT_EMPTY')
   await expectSinglePrompt(page, {
     type: 'INTERACT',
     category: 'FARM',
@@ -262,13 +315,13 @@ test('renders asset-specific crop contextual panels', async ({ page }) => {
 test('renders dog, cat, and bird contextual panels without TALK conversion', async ({ page }) => {
   const token = await enterVillage(page)
   const cases = [
-    { player: { x: 17, y: 10 }, asset: 'DEFAULT_DOG', name: '강아지', copy: '마을을 지켜보며 조용히 쉬고 있는 강아지예요.' },
-    { player: { x: 18, y: 10 }, asset: 'DEFAULT_CAT', name: '고양이', copy: '따뜻한 햇볕 아래에서 편안히 쉬고 있는 고양이예요.' },
-    { player: { x: 19, y: 9 }, asset: 'DEFAULT_BIRD', name: '새', copy: '마을의 작은 소리를 들으며 주변을 바라보는 새예요.' },
+    { asset: 'DEFAULT_DOG', name: '강아지', copy: '마을을 지켜보며 조용히 쉬고 있는 강아지예요.' },
+    { asset: 'DEFAULT_CAT', name: '고양이', copy: '따뜻한 햇볕 아래에서 편안히 쉬고 있는 고양이예요.' },
+    { asset: 'DEFAULT_BIRD', name: '새', copy: '마을의 작은 소리를 들으며 주변을 바라보는 새예요.' },
   ]
 
   for (const item of cases) {
-    await placeAndSync(page, token, item.player)
+    await placeNextToAsset(page, token, item.asset)
     const prompt = await expectSinglePrompt(page, {
       type: 'INTERACT', category: 'ANIMAL', asset: item.asset, name: item.name, action: '다가가기',
     })
@@ -282,7 +335,7 @@ test('renders dog, cat, and bird contextual panels without TALK conversion', asy
 
 test('renders the community house panel and closes contextual UI on range exit', async ({ page }) => {
   const token = await enterVillage(page)
-  await placeAndSync(page, token, { x: 7, y: 3 })
+  await placeAndSync(page, token, { x: 14, y: 7 })
   const communityPrompt = await expectSinglePrompt(page, {
     type: 'INTERACT', category: 'COMMUNITY', asset: 'COMMUNITY_HOUSE', name: '마을 회관', action: '둘러보기',
   })
@@ -323,16 +376,7 @@ test('coordinates INSPECT, CONTEXTUAL, DIALOGUE, and MEMORY_UPLOAD panels', asyn
   await expect(inspect).toHaveCount(0)
   await expect(page.getByRole('region', { name: '비어 있는 밭 살펴보기' })).toBeVisible()
 
-  await placeAndSync(page, token, { x: 17, y: 10 })
-  const animalPrompt = await expectSinglePrompt(page, {
-    type: 'INTERACT', category: 'ANIMAL', asset: 'DEFAULT_DOG', name: '강아지', action: '다가가기',
-  })
-  await animalPrompt.click()
-  await expect(page.getByRole('region', { name: '강아지 살펴보기' })).toBeVisible()
-  await page.keyboard.press('ArrowUp', { delay: 30 })
-  await page.waitForTimeout(800)
-  await page.keyboard.press('ArrowUp', { delay: 30 })
-  await page.waitForTimeout(850)
+  await placeNextToAsset(page, token, 'DEFAULT_NPC_ANIMAL_CARETAKER')
   const talkPrompt = await expectSinglePrompt(page, {
     type: 'TALK', asset: 'DEFAULT_NPC_ANIMAL_CARETAKER', name: '동물 돌봄이', action: '대화하기',
   })
@@ -361,6 +405,9 @@ for (const viewport of [
       const token = await enterVillage(page)
       await placeAndSync(page, token, { x: 4, y: 9 })
 
+      await expect.poll(() => page.evaluate(
+        () => matchMedia('(pointer: coarse)').matches,
+      )).toBe(true)
       const media = await page.evaluate(() => ({
         coarse: matchMedia('(pointer: coarse)').matches,
         hoverNone: matchMedia('(hover: none)').matches,

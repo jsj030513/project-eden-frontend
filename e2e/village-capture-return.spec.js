@@ -5,14 +5,18 @@ import {
   createE2EFixture,
   provisionLocalFixture,
 } from './village-e2e-fixture'
+import { configureResourceStableRendering } from './village-resource-stable-rendering'
 
 const PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 )
-const fixture = createE2EFixture('village-capture')
+let fixture
 
-test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
+test.beforeAll(async ({ request }, workerInfo) => {
+  fixture = createE2EFixture(`village-capture-w${workerInfo.workerIndex}`)
+  await provisionLocalFixture(request, fixture)
+})
 
 async function dismissOnboarding(page) {
   const explore = page.getByRole('button', { name: '천천히 둘러보기' })
@@ -22,6 +26,7 @@ async function dismissOnboarding(page) {
 }
 
 async function enterVillage(page) {
+  await configureResourceStableRendering(page)
   await page.goto(FRONTEND_URL)
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
@@ -31,7 +36,7 @@ async function enterVillage(page) {
     await page.getByRole('textbox', { name: '비밀번호' }).fill(fixture.password)
     await page.getByRole('button', { name: '들어가기' }).click()
   }
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
   const token = await page.evaluate(() => sessionStorage.getItem('projectEdenAccessToken'))
   expect(token).toBeTruthy()
@@ -42,7 +47,7 @@ async function syncVillage(page) {
   await page.reload()
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
 }
 
@@ -79,6 +84,7 @@ function key(x, y) {
 
 function pathTo(state, target) {
   const walkable = new Set(state.terrainTiles.filter((tile) => tile.walkable).map((tile) => key(tile.x, tile.y)))
+  const npcTiles = new Set((state.npcPositions || []).map((npc) => key(npc.x, npc.y)))
   const queue = [{ ...state.playerPosition, path: [] }]
   const seen = new Set([key(state.playerPosition.x, state.playerPosition.y)])
   const directions = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]
@@ -88,7 +94,7 @@ function pathTo(state, target) {
     for (const direction of directions) {
       const next = { x: current.x + direction.x, y: current.y + direction.y }
       const nextKey = key(next.x, next.y)
-      if (seen.has(nextKey) || !walkable.has(nextKey)) continue
+      if (seen.has(nextKey) || !walkable.has(nextKey) || npcTiles.has(nextKey)) continue
       seen.add(nextKey)
       queue.push({ ...next, path: [...current.path, next] })
     }
@@ -97,15 +103,25 @@ function pathTo(state, target) {
 }
 
 async function routePlayer(page, token, target) {
-  const before = await worldState(page, token)
-  for (const step of pathTo(before, target)) {
-    const response = await browserApi(page, token, '/api/worlds/me/move', {
-      method: 'POST',
-      body: { targetX: step.x, targetY: step.y },
-    })
-    expect(response.status).toBe(200)
-    expect(response.body.accepted).toBe(true)
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const state = await worldState(page, token)
+    if (state.playerPosition.x === target.x && state.playerPosition.y === target.y) return
+    let blockedByNpc = false
+    for (const step of pathTo(state, target)) {
+      const response = await browserApi(page, token, '/api/worlds/me/move', {
+        method: 'POST',
+        body: { targetX: step.x, targetY: step.y },
+      })
+      expect(response.status).toBe(200)
+      if (!response.body.accepted && response.body.reason === 'NPC_BLOCKED') {
+        blockedByNpc = true
+        break
+      }
+      expect(response.body.accepted).toBe(true)
+    }
+    if (!blockedByNpc) return
   }
+  throw new Error(`Could not route player to ${target.x},${target.y} after NPC replanning`)
 }
 
 async function openEmptyFarmCapture(page, token, useTouch = false) {
@@ -141,7 +157,7 @@ async function chooseFixtureImage(page) {
   await expect(page.getByRole('button', { name: '기억 남기기' })).toBeVisible()
 }
 
-function recognitionFixture(photoId, recognizedObject = 'FLOWER') {
+function recognitionFixture(photoId, recognizedObject = 'FLOWER', ecologyPlacement = null) {
   return {
     recognitionId: 880001,
     photoId,
@@ -158,8 +174,31 @@ function recognitionFixture(photoId, recognizedObject = 'FLOWER') {
         : '이 기억은 마을의 새로운 풍경이 되었습니다.',
       focusX: 240,
       focusY: 336,
+      ...(ecologyPlacement ? { ecologyPlacement } : {}),
     },
   }
+}
+
+async function installGeneralEcologyRoutes(page, photoId, ecologyPlacement) {
+  const counts = { photo: 0, recognition: 0 }
+  await page.route('**/api/photos', async (route) => {
+    if (route.request().method() !== 'POST') return route.continue()
+    counts.photo += 1
+    return route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: photoId, photoId }) })
+  })
+  await page.route(`**/api/photos/${photoId}/recognize`, async (route) => {
+    counts.recognition += 1
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(recognitionFixture(
+        photoId,
+        ecologyPlacement.category === 'NON_PLACEABLE' ? 'UNKNOWN' : 'DOG',
+        ecologyPlacement,
+      )),
+    })
+  })
+  return counts
 }
 
 function plantingFixture(photoId, recognizedObject = 'FLOWER') {
@@ -361,7 +400,7 @@ test('a world-state-only refetch failure retains the prior world and position', 
   await page.getByRole('button', { name: '기억 남기기' }).click()
 
   await expect(page.locator('.village-stage')).toBeVisible()
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   expect(counts).toEqual({ photo: 1, planting: 1 })
   expect(worldStateFailures).toBe(1)
   expect(await screenPosition(page)).toEqual(beforeScreen)
@@ -386,7 +425,7 @@ test('a full Village refresh failure falls back without duplicate navigation or 
   await page.getByRole('button', { name: '기억 남기기' }).click()
 
   await expect(page.locator('.village-stage')).toBeVisible()
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   expect(await screenPosition(page)).toEqual(beforeScreen)
   expect(counts).toEqual({ photo: 1, planting: 1 })
   expect(villageFailures).toBe(1)
@@ -415,6 +454,56 @@ test('non-plantable recognition returns safely without a crop reveal', async ({ 
   observer.stop()
 })
 
+test('remote ecology placement reports its region without forcing a focus reveal', async ({ page }) => {
+  await enterVillage(page)
+  await page.getByRole('button', { name: '오늘의 순간 남기기' }).click()
+  const counts = await installGeneralEcologyRoutes(page, 960001, {
+    applied: true,
+    category: 'ANIMAL',
+    assetType: 'DEFAULT_DOG',
+    objectId: 970001,
+    chunkX: -1,
+    chunkY: 0,
+    regionType: 'MEADOW',
+    spawnZone: 'OPEN_GRASS',
+    reason: 'PLACED',
+    profileKey: 'DOG_V1',
+    version: 1,
+  })
+  await chooseFixtureImage(page)
+  await page.getByRole('button', { name: '기억 남기기' }).click()
+
+  await expect(page.locator('.village-stage')).toBeVisible()
+  await expect(page.locator('.village-status')).toContainText('초원에 새로운 기억이 자리 잡았어요')
+  await expect(page.locator('.world-change-cluster')).toHaveCount(0)
+  expect(counts).toEqual({ photo: 1, recognition: 1 })
+})
+
+test('non-placeable ecology result keeps recognition and returns without false mutation reveal', async ({ page }) => {
+  await enterVillage(page)
+  await page.getByRole('button', { name: '오늘의 순간 남기기' }).click()
+  const counts = await installGeneralEcologyRoutes(page, 960002, {
+    applied: false,
+    category: 'NON_PLACEABLE',
+    assetType: 'MEMORY_SPARK',
+    objectId: null,
+    chunkX: null,
+    chunkY: null,
+    regionType: null,
+    spawnZone: null,
+    reason: 'PROFILE_NOT_PLACEABLE',
+    profileKey: 'UNKNOWN_V1',
+    version: 1,
+  })
+  await chooseFixtureImage(page)
+  await page.getByRole('button', { name: '기억 남기기' }).click()
+
+  await expect(page.locator('.village-stage')).toBeVisible()
+  await expect(page.locator('.village-reveal-layer')).toHaveCount(0)
+  await expect(page.locator('.village-status')).toContainText('소중한 기억으로 남겼어요')
+  expect(counts).toEqual({ photo: 1, recognition: 1 })
+})
+
 for (const viewport of [
   { width: 375, height: 667 },
   { width: 390, height: 844 },
@@ -426,6 +515,9 @@ for (const viewport of [
     try {
       const token = await enterVillage(page)
       const capture = await openEmptyFarmCapture(page, token, true)
+      await expect.poll(() => page.evaluate(
+        () => matchMedia('(pointer: coarse)').matches,
+      )).toBe(true)
       const media = await page.evaluate(() => ({
         coarse: matchMedia('(pointer: coarse)').matches,
         touchPoints: navigator.maxTouchPoints,

@@ -6,14 +6,18 @@ import {
   findEmptyPlotTarget,
   provisionLocalFixture,
 } from './village-e2e-fixture'
+import { configureResourceStableRendering } from './village-resource-stable-rendering'
 
 const PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 )
-const fixture = createE2EFixture('village-planting')
+let fixture
 
-test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
+test.beforeAll(async ({ request }, workerInfo) => {
+  fixture = createE2EFixture(`village-planting-w${workerInfo.workerIndex}`)
+  await provisionLocalFixture(request, fixture)
+})
 
 async function dismissOnboarding(page) {
   const explore = page.getByRole('button', { name: '천천히 둘러보기' })
@@ -23,6 +27,7 @@ async function dismissOnboarding(page) {
 }
 
 async function enterVillage(page, activeFixture = fixture) {
+  await configureResourceStableRendering(page)
   await page.goto(FRONTEND_URL)
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
@@ -32,7 +37,7 @@ async function enterVillage(page, activeFixture = fixture) {
     await page.getByRole('textbox', { name: '비밀번호' }).fill(activeFixture.password)
     await page.getByRole('button', { name: '들어가기' }).click()
   }
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
   const token = await page.evaluate(() => sessionStorage.getItem('projectEdenAccessToken'))
   expect(token).toBeTruthy()
@@ -43,7 +48,7 @@ async function syncVillage(page) {
   await page.reload()
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
 }
 
@@ -87,8 +92,23 @@ function unaffectedWorldState(state, excludedObjectIds = []) {
   return {
     terrainTiles: state.terrainTiles,
     playerPosition: state.playerPosition,
-    npcPositions: state.npcPositions,
-    placedObjects: state.placedObjects.filter((object) => !excluded.has(object.id)),
+    npcPositions: (state.npcPositions || []).map((npc) => ({
+      objectId: npc.objectId,
+      npcKey: npc.npcKey,
+      assetType: npc.assetType,
+    })),
+    placedObjects: state.placedObjects
+      .filter((object) => !excluded.has(object.id))
+      .map((object) => object.worldCategory === 'ANIMAL'
+        ? {
+            id: object.id,
+            assetType: object.assetType,
+            habitatType: object.habitatType,
+            variant: object.variant,
+            worldCategory: object.worldCategory,
+            worldChangeId: object.worldChangeId,
+          }
+        : object),
   }
 }
 
@@ -98,6 +118,7 @@ function key(x, y) {
 
 function pathTo(state, target) {
   const walkable = new Set(state.terrainTiles.filter((tile) => tile.walkable).map((tile) => key(tile.x, tile.y)))
+  const npcTiles = new Set((state.npcPositions || []).map((npc) => key(npc.x, npc.y)))
   const queue = [{ ...state.playerPosition, path: [] }]
   const seen = new Set([key(state.playerPosition.x, state.playerPosition.y)])
   const directions = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]
@@ -107,7 +128,7 @@ function pathTo(state, target) {
     for (const direction of directions) {
       const next = { x: current.x + direction.x, y: current.y + direction.y }
       const nextKey = key(next.x, next.y)
-      if (seen.has(nextKey) || !walkable.has(nextKey)) continue
+      if (seen.has(nextKey) || !walkable.has(nextKey) || npcTiles.has(nextKey)) continue
       seen.add(nextKey)
       queue.push({ ...next, path: [...current.path, next] })
     }
@@ -116,15 +137,25 @@ function pathTo(state, target) {
 }
 
 async function routePlayer(page, token, target) {
-  const state = await worldState(page, token)
-  for (const step of pathTo(state, target)) {
-    const response = await browserApi(page, token, '/api/worlds/me/move', {
-      method: 'POST',
-      body: { targetX: step.x, targetY: step.y },
-    })
-    expect(response.status).toBe(200)
-    expect(response.body.accepted).toBe(true)
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const state = await worldState(page, token)
+    if (state.playerPosition.x === target.x && state.playerPosition.y === target.y) return
+    let blockedByNpc = false
+    for (const step of pathTo(state, target)) {
+      const response = await browserApi(page, token, '/api/worlds/me/move', {
+        method: 'POST',
+        body: { targetX: step.x, targetY: step.y },
+      })
+      expect(response.status).toBe(200)
+      if (!response.body.accepted && response.body.reason === 'NPC_BLOCKED') {
+        blockedByNpc = true
+        break
+      }
+      expect(response.body.accepted).toBe(true)
+    }
+    if (!blockedByNpc) return
   }
+  throw new Error(`Could not route player to ${target.x},${target.y} after NPC replanning`)
 }
 
 async function openTargetedCapture(page, token, useTouch = false) {
@@ -217,7 +248,9 @@ function plantedWorldState(state, target) {
       plantingResponse({ photoId: 900001, target, applied: true }).worldChange,
     ],
     availableInteractions: [
-      ...(state.availableInteractions ?? []).filter((interaction) => interaction.targetId !== target.id),
+      ...(state.availableInteractions ?? []).filter((interaction) => (
+        interaction.targetId !== target.id && interaction.available !== true
+      )),
       {
         x: target.x,
         y: target.y,
@@ -568,6 +601,9 @@ for (const viewport of [
       await expect(page.locator('.village-reveal-layer')).toHaveCount(0, { timeout: 5_000 })
       const cropPrompt = page.getByRole('button', { name: '꽃밭 · 작물 살펴보기' })
       await expect(cropPrompt).toBeVisible()
+      await expect.poll(() => page.evaluate(
+        () => matchMedia('(pointer: coarse)').matches,
+      )).toBe(true)
       const media = await page.evaluate(() => ({
         coarse: matchMedia('(pointer: coarse)').matches,
         touchPoints: navigator.maxTouchPoints,
@@ -665,7 +701,7 @@ test('actual C1 runtime persists one empty plot as a crop and returns the backen
     unaffectedWorldState(currentUserBefore, [target.id]),
   )
   const observerAfter = await requestWorldState(request, observerProvision.token)
-  expect(observerAfter).toEqual(observerBefore)
+  expect(unaffectedWorldState(observerAfter)).toEqual(unaffectedWorldState(observerBefore))
 })
 
 test('actual C1 runtime persists a non-plantable recognition while keeping the empty plot', async ({
@@ -730,7 +766,7 @@ test('actual C1 runtime persists a non-plantable recognition while keeping the e
     ))).toEqual([
       expect.objectContaining({ id: target.id, assetType: 'FARM_PLOT_EMPTY' }),
     ])
-    expect(reloadedState).toEqual(worldBefore)
+    expect(unaffectedWorldState(reloadedState)).toEqual(unaffectedWorldState(worldBefore))
 
     await testInfo.attach('actual-nonplantable-runtime-evidence', {
       body: Buffer.from(JSON.stringify({

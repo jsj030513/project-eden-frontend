@@ -13,7 +13,9 @@ import { getMyNpcs, getNpcDialogue } from '../api/npcApi'
 import { uploadPhoto } from '../api/photoApi'
 import { recognizePhoto } from '../api/recognitionApi'
 import { getVillageChanges, getVillageHistory, getVillageInterpretation, getMyVillage } from '../api/villageApi'
-import { createHouse, createInventory, createWorld, getMyHouse, getMyInventory, getMyWorld, getMyWorldState, moveMyPlayer, plantMemory } from '../api/worldApi'
+import { createHouse, createInventory, createWorld, getMyHouse, getMyInventory, getMyWorld, getMyWorldChunks, getMyWorldState, moveMyPlayer, plantMemory } from '../api/worldApi'
+import { chunkKey, tileToChunk, WorldChunkCache } from '../components/village/worldChunkCache'
+import { recordHydrationDiagnostic } from '../components/village/phase3cDiagnostics'
 
 const PAGES = {
   LANDING: 'landing',
@@ -140,6 +142,7 @@ function getChangeObjectType(change, category) {
 
 function buildRevealState(previousState, nextState, recognition) {
   const worldChange = recognition?.worldChange
+  const ecologyPlacement = worldChange?.ecologyPlacement
   const previousTheme = getTheme(previousState.interpretation)
   const nextTheme = getTheme(nextState.interpretation)
   const themeChanged = Boolean(nextTheme && previousTheme !== nextTheme)
@@ -156,7 +159,11 @@ function buildRevealState(previousState, nextState, recognition) {
   const category = normalizedCategory === 'UNKNOWN' ? 'GENERAL_MEMORY' : normalizedCategory
   const changeType = themeChanged ? 'THEME_CHANGE' : category
   const objectType = worldChange?.assetType || getChangeObjectType(newestChange, category)
-  const message = worldChange?.displayMessage || (themeChanged
+  const regionNames = { HUB: '마을', MEADOW: '초원', FOREST: '숲', POND: '연못가' }
+  const placedRegionName = ecologyPlacement?.regionType ? regionNames[ecologyPlacement.regionType] : null
+  const message = ecologyPlacement?.applied && ecologyPlacement.regionType !== 'HUB'
+    ? `${placedRegionName || '발견한 지역'}에 새로운 기억이 자리 잡았어요.`
+    : worldChange?.displayMessage || (themeChanged
     ? THEME_REVEAL_MESSAGES[nextTheme] || DEFAULT_REVEAL_MESSAGE
     : CATEGORY_REVEAL_MESSAGES[category] || DEFAULT_REVEAL_MESSAGE)
 
@@ -172,8 +179,24 @@ function buildRevealState(previousState, nextState, recognition) {
     category,
     themeChanged,
     message,
-    focusPosition: worldChange ? { x: worldChange.focusX, y: worldChange.focusY } : null,
+    focusPosition: worldChange && (!ecologyPlacement || ecologyPlacement.regionType === 'HUB')
+      ? { x: worldChange.focusX, y: worldChange.focusY }
+      : null,
+    ecologyPlacement: ecologyPlacement || null,
   }
+}
+
+function getEcologyPlacement(recognition) {
+  return recognition?.worldChange?.ecologyPlacement || null
+}
+
+function ecologyPlacementNotice(placement) {
+  return {
+    CAPACITY_REACHED: '발견한 지역이 이미 풍성해 이 기억은 기록으로만 남겼어요.',
+    NO_COMPATIBLE_REGION: '어울리는 지역을 아직 발견하지 못해 이 기억은 기록으로 남겼어요.',
+    NO_SAFE_SPAWN_TILE: '안전하게 자리 잡을 곳이 없어 이 기억은 기록으로만 남겼어요.',
+    PROFILE_NOT_PLACEABLE: '이 장면은 새로운 생명으로 꾸미지 않고 소중한 기억으로 남겼어요.',
+  }[placement?.reason] || '사진은 기억으로 남았지만 마을에는 새 오브젝트를 만들지 않았어요.'
 }
 
 function emptyCaptureState() {
@@ -216,6 +239,7 @@ function getPhotoId(photo) {
 }
 
 function isUnknownRecognition(recognition) {
+  if (getEcologyPlacement(recognition)) return false
   const recognizedObject = String(recognition?.recognizedObject || '').toUpperCase()
   // OBJECT + UNKNOWN category is the backend's explicit GENERAL_MEMORY
   // fallback: the image was processed successfully, but no specific thing was
@@ -295,6 +319,13 @@ function App() {
   const revealEndTimerRef = useRef(null)
   const captureCompletionRef = useRef(false)
   const skipNextVillageFetchRef = useRef(false)
+  const villageFetchPromiseRef = useRef(null)
+  const worldStateRefreshPromiseRef = useRef(null)
+  const worldChunkCacheRef = useRef(new WorldChunkCache())
+  const hydrationSessionRef = useRef(`reload-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`)
+  const worldRequestSequenceRef = useRef(0)
+  const acceptedWorldSequenceRef = useRef(0)
+  const acceptedWorldIdRef = useRef(null)
   const [page, setPage] = useState(PAGES.LANDING)
   const [authState, setAuthState] = useState({
     accessToken: getAccessToken(),
@@ -394,6 +425,8 @@ function App() {
   }, [])
 
   const resetAuth = useCallback(() => {
+    acceptedWorldSequenceRef.current = ++worldRequestSequenceRef.current
+    acceptedWorldIdRef.current = null
     clearAccessToken()
     setAuthState({
       accessToken: null,
@@ -409,8 +442,86 @@ function App() {
     setCaptureTargetContext(null)
     captureCompletionRef.current = false
     skipNextVillageFetchRef.current = false
+    worldChunkCacheRef.current.reset()
     setTutorialState(createInitialTutorialState(readTutorialCompleted()))
     setPage(PAGES.AUTH)
+  }, [])
+
+  const acceptWorldState = useCallback((worldState, requestSequence) => {
+    const worldId = worldState?.worldId ?? null
+    if (worldId == null || requestSequence < acceptedWorldSequenceRef.current) {
+      recordHydrationDiagnostic('STATE_REJECTED_STALE', {
+        reloadSession: hydrationSessionRef.current,
+        requestSequence,
+        latestStateRequestSequence: acceptedWorldSequenceRef.current,
+        worldId,
+        reason: worldId == null ? 'WORLD_ID_MISSING' : 'OLDER_SEQUENCE',
+      })
+      return false
+    }
+    acceptedWorldSequenceRef.current = requestSequence
+    acceptedWorldIdRef.current = worldId
+    recordHydrationDiagnostic('WORLD_ID_SET', {
+      reloadSession: hydrationSessionRef.current,
+      requestSequence,
+      worldId,
+    })
+    worldChunkCacheRef.current.seedFromWorldState(worldState)
+    recordHydrationDiagnostic('STATE_ACCEPTED', {
+      reloadSession: hydrationSessionRef.current,
+      requestSequence,
+      worldId,
+      stateTerrainCount: worldState.terrainTiles?.length ?? 0,
+      stateObjectCount: worldState.placedObjects?.length ?? 0,
+    })
+    return true
+  }, [])
+
+  const hydrateWorldStateChunks = useCallback(async (worldState, requestSequence, radius = 1) => {
+    if (!worldState?.playerPosition) return worldState
+    const centerChunkX = tileToChunk(worldState.playerPosition.x)
+    const centerChunkY = tileToChunk(worldState.playerPosition.y)
+    const expectedWorldId = worldState.worldId
+    const expectedCacheEpoch = worldChunkCacheRef.current.epoch
+    const response = await worldChunkCacheRef.current.fetchRange({
+      centerChunkX,
+      centerChunkY,
+      radius,
+      loader: () => getMyWorldChunks(centerChunkX, centerChunkY, radius, { suppressAuthRedirect: true }),
+    })
+    if (requestSequence !== acceptedWorldSequenceRef.current
+      || String(expectedWorldId) !== String(acceptedWorldIdRef.current)
+      || expectedCacheEpoch !== worldChunkCacheRef.current.epoch
+      || String(response?.world?.worldId) !== String(expectedWorldId)) {
+      recordHydrationDiagnostic('CHUNK_REJECTED_STALE', {
+        reloadSession: hydrationSessionRef.current,
+        requestSequence,
+        latestStateRequestSequence: acceptedWorldSequenceRef.current,
+        worldId: response?.world?.worldId ?? null,
+        expectedWorldId,
+        reason: 'APP_SEQUENCE_OR_IDENTITY_CHANGED',
+      })
+      return null
+    }
+    const snapshot = worldChunkCacheRef.current.synthesize(worldState, response)
+    recordHydrationDiagnostic('RENDER_SNAPSHOT_CREATED', {
+      reloadSession: hydrationSessionRef.current,
+      requestSequence,
+      worldId: expectedWorldId,
+      renderTerrainCount: snapshot.terrainTiles?.length ?? 0,
+      cacheChunkCount: snapshot.chunkCacheSize ?? 0,
+    })
+    return snapshot
+  }, [])
+
+  useEffect(() => {
+    recordHydrationDiagnostic('AUTH_RESTORE_START', {
+      reloadSession: hydrationSessionRef.current,
+    })
+    recordHydrationDiagnostic('AUTH_RESTORE_DONE', {
+      reloadSession: hydrationSessionRef.current,
+      authenticated: Boolean(getAccessToken()),
+    })
   }, [])
 
   useEffect(() => {
@@ -440,10 +551,17 @@ function App() {
   }
 
   const ensureCharacterReady = useCallback(async () => {
+    recordHydrationDiagnostic('CHARACTER_REQUEST_START', {
+      reloadSession: hydrationSessionRef.current,
+    })
     setCharacterState((current) => ({ ...current, isLoading: true, error: null }))
 
     try {
       const character = await getMyCharacter()
+      recordHydrationDiagnostic('CHARACTER_REQUEST_DONE', {
+        reloadSession: hydrationSessionRef.current,
+        characterId: character?.id ?? character?.characterId ?? null,
+      })
       await prepareWorldResources()
       setCharacterState({ character, isReady: true, isLoading: false, error: null })
       setAuthMode('login')
@@ -461,13 +579,21 @@ function App() {
     }
   }, [])
 
-  const fetchVillageData = useCallback(async ({ suppressAuthRedirect = false } = {}) => {
+  const fetchVillageData = useCallback(({ suppressAuthRedirect = false } = {}) => {
+    if (villageFetchPromiseRef.current) return villageFetchPromiseRef.current
+    const request = (async () => {
     setVillageState((current) => ({ ...current, isLoading: true, notice: null, error: null }))
 
     try {
       const guardedRequestOptions = { suppressAuthRedirect }
       const village = await getMyVillage(guardedRequestOptions)
       const optionalRequestOptions = { suppressAuthRedirect: true }
+      const stateRequestSequence = ++worldRequestSequenceRef.current
+      recordHydrationDiagnostic('STATE_REQUEST_START', {
+        reloadSession: hydrationSessionRef.current,
+        requestSequence: stateRequestSequence,
+        worldId: acceptedWorldIdRef.current,
+      })
       const [interpretationResult, changesResult, historyResult, npcsResult, worldStateResult] = await Promise.allSettled([
         getVillageInterpretation(optionalRequestOptions),
         getVillageChanges(optionalRequestOptions),
@@ -480,6 +606,16 @@ function App() {
       const history = historyResult.status === 'fulfilled' ? historyResult.value : undefined
       const npcs = npcsResult.status === 'fulfilled' ? npcsResult.value : undefined
       const worldState = worldStateResult.status === 'fulfilled' ? worldStateResult.value : undefined
+      if (worldState) {
+        recordHydrationDiagnostic('STATE_RESPONSE', {
+          reloadSession: hydrationSessionRef.current,
+          requestSequence: stateRequestSequence,
+          worldId: worldState.worldId ?? null,
+          stateTerrainCount: worldState.terrainTiles?.length ?? 0,
+          stateObjectCount: worldState.placedObjects?.length ?? 0,
+        })
+      }
+      const worldStateAccepted = Boolean(worldState && acceptWorldState(worldState, stateRequestSequence))
       const hasPartialFailure = [interpretationResult, changesResult, historyResult, npcsResult, worldStateResult]
         .some((result) => result.status === 'rejected')
 
@@ -492,7 +628,7 @@ function App() {
         notice: hasPartialFailure ? PARTIAL_VILLAGE_ERROR_MESSAGE : null,
         isLoading: false,
         error: null,
-        worldState: worldState ?? current.worldState,
+        worldState: worldStateAccepted ? worldState : current.worldState,
       }))
       setNpcState((current) => ({
         ...current,
@@ -500,28 +636,120 @@ function App() {
         npcId: npcs?.[0]?.id ?? current.npcId ?? import.meta.env.VITE_DEFAULT_NPC_ID ?? '1',
         error: null,
       }))
+      if (worldStateAccepted) {
+        hydrateWorldStateChunks(worldState, stateRequestSequence)
+          .then((hydrated) => {
+            if (hydrated) setVillageState((current) => ({ ...current, worldState: hydrated }))
+          })
+          .catch(() => {})
+      }
       return { village, interpretation, changes, history, npcs, worldState }
     } catch (error) {
       setVillageState((current) => ({ ...current, isLoading: false, error: VILLAGE_ERROR_MESSAGE }))
       throw error
     }
-  }, [])
+    })()
+    villageFetchPromiseRef.current = request
+    request.finally(() => {
+      if (villageFetchPromiseRef.current === request) villageFetchPromiseRef.current = null
+    }).catch(() => {})
+    return request
+  }, [acceptWorldState, hydrateWorldStateChunks])
 
-  const refreshMyWorldState = useCallback(async () => {
-    try {
-      const worldState = await getMyWorldState({ suppressAuthRedirect: true })
-      setVillageState((current) => ({ ...current, worldState }))
-      return worldState
-    } catch {
-      // The latest server-approved movement position remains valid on refresh failure.
-      return null
-    }
-  }, [])
+  const refreshMyWorldState = useCallback(() => {
+    if (worldStateRefreshPromiseRef.current) return worldStateRefreshPromiseRef.current
+    const request = (async () => {
+      try {
+        const stateRequestSequence = ++worldRequestSequenceRef.current
+        recordHydrationDiagnostic('STATE_REQUEST_START', {
+          reloadSession: hydrationSessionRef.current,
+          requestSequence: stateRequestSequence,
+          worldId: acceptedWorldIdRef.current,
+        })
+        const worldState = await getMyWorldState({ suppressAuthRedirect: true })
+        recordHydrationDiagnostic('STATE_RESPONSE', {
+          reloadSession: hydrationSessionRef.current,
+          requestSequence: stateRequestSequence,
+          worldId: worldState.worldId ?? null,
+          stateTerrainCount: worldState.terrainTiles?.length ?? 0,
+          stateObjectCount: worldState.placedObjects?.length ?? 0,
+        })
+        if (!acceptWorldState(worldState, stateRequestSequence)) return null
+        setVillageState((current) => ({ ...current, worldState }))
+        hydrateWorldStateChunks(worldState, stateRequestSequence)
+          .then((hydrated) => {
+            if (hydrated) setVillageState((current) => ({ ...current, worldState: hydrated }))
+          })
+          .catch(() => {})
+        return worldState
+      } catch {
+        // The latest server-approved movement position remains valid on refresh failure.
+        return null
+      }
+    })()
+    worldStateRefreshPromiseRef.current = request
+    request.finally(() => {
+      if (worldStateRefreshPromiseRef.current === request) worldStateRefreshPromiseRef.current = null
+    }).catch(() => {})
+    return request
+  }, [acceptWorldState, hydrateWorldStateChunks])
 
   const moveMyVillagePlayer = useCallback(
-    (targetX, targetY) => moveMyPlayer(targetX, targetY, { suppressAuthRedirect: true }),
+    async (targetX, targetY) => {
+      const result = await moveMyPlayer(targetX, targetY, { suppressAuthRedirect: true })
+      if (result?.accepted) {
+        const expectedWorldId = acceptedWorldIdRef.current
+        const expectedCacheEpoch = worldChunkCacheRef.current.epoch
+        const centerChunkX = tileToChunk(result.currentX)
+        const centerChunkY = tileToChunk(result.currentY)
+        const targetKey = chunkKey(centerChunkX, centerChunkY)
+        const mergeChunkResponse = (response) => {
+          if (!response
+            || expectedCacheEpoch !== worldChunkCacheRef.current.epoch
+            || String(response?.world?.worldId) !== String(expectedWorldId)) return
+          setVillageState((current) => {
+            if (!current.worldState || String(current.worldState.worldId) !== String(expectedWorldId)) return current
+            const baseState = {
+              ...current.worldState,
+              playerPosition: { x: result.currentX, y: result.currentY },
+              regionDiscovery: result.newlyDiscovered ? {
+                chunkX: result.chunkX,
+                chunkY: result.chunkY,
+                regionType: result.regionType,
+                regionDisplayKey: result.regionDisplayKey,
+                key: `${result.chunkX}:${result.chunkY}:${result.regionType}`,
+              } : null,
+            }
+            return {
+              ...current,
+              worldState: worldChunkCacheRef.current.synthesize(baseState, response),
+            }
+          })
+        }
+        const preload = worldChunkCacheRef.current.fetchRange({
+          centerChunkX,
+          centerChunkY,
+          radius: 1,
+          loader: () => getMyWorldChunks(centerChunkX, centerChunkY, 1, { suppressAuthRedirect: true }),
+        }).catch(() => null)
+        if (worldChunkCacheRef.current.hasGenerated(targetKey)) {
+          preload.then(mergeChunkResponse)
+        } else {
+          mergeChunkResponse(await preload)
+        }
+      }
+      return result
+    },
     [],
   )
+
+  const pinInteractionChunk = useCallback((interaction) => {
+    worldChunkCacheRef.current.pinOnly(
+      Number.isInteger(interaction?.x) && Number.isInteger(interaction?.y)
+        ? chunkKey(tileToChunk(interaction.x), tileToChunk(interaction.y))
+        : null,
+    )
+  }, [])
 
   const enterVillage = async () => {
     if (!authState.isAuthenticated) {
@@ -725,6 +953,16 @@ function App() {
       setCaptureState((current) => ({ ...current, status: 'recognizing' }))
       const recognition = await recognizePhoto(photoId, { suppressAuthRedirect: true })
 
+      const ecologyPlacement = getEcologyPlacement(recognition)
+      if (ecologyPlacement && !ecologyPlacement.applied) {
+        await completeRecognizedMoment(recognition, previousVillageSnapshot, {
+          reveal: false,
+          notice: ecologyPlacementNotice(ecologyPlacement),
+          showSuccessToast: false,
+        })
+        return
+      }
+
       if (isUnknownRecognition(recognition)) {
         setCaptureState((current) => ({
           ...current,
@@ -775,6 +1013,16 @@ function App() {
       }
 
       const recognition = await recognizePhoto(captureState.uploadedPhotoId, { suppressAuthRedirect: true })
+
+      const ecologyPlacement = getEcologyPlacement(recognition)
+      if (ecologyPlacement && !ecologyPlacement.applied) {
+        await completeRecognizedMoment(recognition, previousVillageSnapshot, {
+          reveal: false,
+          notice: ecologyPlacementNotice(ecologyPlacement),
+          showSuccessToast: false,
+        })
+        return
+      }
 
       if (isUnknownRecognition(recognition)) {
         setCaptureState((current) => ({
@@ -912,6 +1160,12 @@ function App() {
   }
 
   useEffect(() => {
+    if (page !== PAGES.CAPTURE || !captureTargetContext) return
+    pinInteractionChunk(captureTargetContext)
+    return () => pinInteractionChunk(null)
+  }, [captureTargetContext, page, pinInteractionChunk])
+
+  useEffect(() => {
     if (tutorialState.isActive && tutorialState.currentStep === TUTORIAL_STEPS.COMPLETE) {
       const finishTimer = window.setTimeout(() => completeTutorial(), 3000)
       return () => window.clearTimeout(finishTimer)
@@ -964,6 +1218,8 @@ function App() {
             onTutorialEvent={handleTutorialEvent}
             onMove={moveMyVillagePlayer}
             onMovementEnd={refreshMyWorldState}
+            onRefreshWorldState={refreshMyWorldState}
+            onPinnedInteractionChange={pinInteractionChunk}
           />
         )
       case PAGES.CAPTURE:

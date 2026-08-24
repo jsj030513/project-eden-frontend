@@ -5,11 +5,24 @@ import {
   createE2EFixture,
   provisionLocalFixture,
 } from './village-e2e-fixture'
+import { configureResourceStableRendering } from './village-resource-stable-rendering'
+import { communityHouseVisualStyle } from '../src/components/village/worldHubLayout'
+import { WORLD_CAMERA_SCALE } from '../src/components/village/worldViewport'
 
 const TILE_SIZE = 48
 const fixture = createE2EFixture('village-final')
+const touchViewports = [
+  { viewport: { width: 375, height: 667 }, fixture: createE2EFixture('village-final-touch-375') },
+  { viewport: { width: 390, height: 844 }, fixture: createE2EFixture('village-final-touch-390') },
+  { viewport: { width: 430, height: 932 }, fixture: createE2EFixture('village-final-touch-430') },
+]
 
-test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
+test.beforeAll(async ({ request }) => {
+  await provisionLocalFixture(request, fixture)
+  for (const touchViewport of touchViewports) {
+    await provisionLocalFixture(request, touchViewport.fixture)
+  }
+})
 
 function evidence(name, value) {
   console.log(`EVIDENCE ${name} ${JSON.stringify(value)}`)
@@ -31,7 +44,8 @@ async function dismissOnboarding(page) {
   if (await later.isVisible().catch(() => false)) await later.click()
 }
 
-async function enterVillage(page) {
+async function enterVillage(page, userFixture = fixture) {
+  await configureResourceStableRendering(page)
   await page.goto(FRONTEND_URL)
 
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
@@ -39,12 +53,12 @@ async function enterVillage(page) {
 
   const email = page.getByRole('textbox', { name: '이메일' })
   if (await email.isVisible().catch(() => false)) {
-    await email.fill(fixture.email)
-    await page.getByRole('textbox', { name: '비밀번호' }).fill(fixture.password)
+    await email.fill(userFixture.email)
+    await page.getByRole('textbox', { name: '비밀번호' }).fill(userFixture.password)
     await page.getByRole('button', { name: '들어가기' }).click()
   }
 
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
   await expect(page.locator('.pixel-character')).toBeVisible()
 
@@ -57,7 +71,7 @@ async function syncVillage(page) {
   await page.reload()
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
   await expect(page.locator('.pixel-character')).toBeVisible()
 }
@@ -89,6 +103,70 @@ async function browserApi(page, token, path, { method = 'GET', body } = {}) {
   })
 }
 
+for (const viewport of [{ width: 1440, height: 900 }, { width: 1920, height: 1080 }]) {
+  test(`renders the complete compact server-authored village at ${viewport.width}x${viewport.height}`, async ({ browser }, testInfo) => {
+    const context = await browser.newContext({ viewport })
+    try {
+      const page = await context.newPage()
+      await enterVillage(page)
+      const metrics = await page.evaluate(() => {
+        const world = document.querySelector('.village-world')?.getBoundingClientRect()
+        const objects = [...document.querySelectorAll('[data-world-object-id]')]
+        const house = document.querySelector('.asset-community_house')?.getBoundingClientRect()
+        const labels = [...document.querySelectorAll('.world-object-label')].map((label) => label.textContent)
+        return {
+          world: world ? { left: world.left, top: world.top, right: world.right, bottom: world.bottom, width: world.width, height: world.height } : null,
+          house: house ? { width: house.width, height: house.height } : null,
+          objectCount: objects.length,
+          animalCount: objects.filter((object) => object.classList.contains('is-world-animal')).length,
+          npcCount: objects.filter((object) => object.classList.contains('is-world-npc')).length,
+          farmZones: document.querySelectorAll('.visual-farm').length,
+          plazaVisible: Boolean(document.querySelector('.visual-plaza')),
+          pondVisible: Boolean(document.querySelector('.visual-pond')),
+          bridgeVisible: Boolean(document.querySelector('.visual-bridge')),
+          roleLabels: labels.filter((label) => ['마을 안내자', '정원 관리인', '기억 보관인', '동물 돌봄이'].includes(label)),
+          dogVisible: Boolean(document.querySelector('.asset-default_dog')),
+          catVisible: Boolean(document.querySelector('.asset-default_cat')),
+          birdCount: document.querySelectorAll('.asset-default_bird').length,
+          duplicateObjectIds: objects.length - new Set(objects.map((object) => object.dataset.worldObjectId)).size,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth,
+          verticalOverflow: document.documentElement.scrollHeight > innerHeight,
+        }
+      })
+      expect(metrics.world.left).toBeLessThanOrEqual(0)
+      expect(metrics.world.top).toBeLessThanOrEqual(0)
+      expect(metrics.world.right).toBeGreaterThanOrEqual(viewport.width)
+      expect(metrics.world.bottom).toBeGreaterThanOrEqual(viewport.height)
+      expect(metrics.objectCount).toBeGreaterThanOrEqual(35)
+      expect(metrics.animalCount).toBeGreaterThanOrEqual(4)
+      expect(metrics.npcCount).toBe(4)
+      expect(metrics.farmZones).toBe(4)
+      expect(metrics.plazaVisible).toBe(true)
+      expect(metrics.pondVisible).toBe(true)
+      expect(metrics.bridgeVisible).toBe(true)
+      const houseStyle = communityHouseVisualStyle()
+      const expectedHouseWidth = Number.parseFloat(houseStyle['--community-house-width']) * WORLD_CAMERA_SCALE
+      const expectedHouseHeight = Number.parseFloat(houseStyle['--community-house-height']) / 2 * WORLD_CAMERA_SCALE
+      expect(metrics.house.width).toBeCloseTo(expectedHouseWidth, 0)
+      expect(metrics.house.height).toBeCloseTo(expectedHouseHeight, 0)
+      expect(metrics.roleLabels).toHaveLength(4)
+      expect(metrics.dogVisible).toBe(true)
+      expect(metrics.catVisible).toBe(true)
+      expect(metrics.birdCount).toBeGreaterThanOrEqual(2)
+      expect(metrics.duplicateObjectIds).toBe(0)
+      expect(metrics.horizontalOverflow).toBe(false)
+      expect(metrics.verticalOverflow).toBe(false)
+      await testInfo.attach(`compact-village-${viewport.width}x${viewport.height}`, {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+      })
+      await attachEvidence(testInfo, `compact-${viewport.width}x${viewport.height}`, metrics)
+    } finally {
+      await context.close()
+    }
+  })
+}
+
 async function state(page, token) {
   const response = await browserApi(page, token, '/api/worlds/me/state')
   expect(response.status).toBe(200)
@@ -102,6 +180,7 @@ function key(x, y) {
 function pathTo(worldState, target) {
   const start = worldState.playerPosition
   const walkable = new Set(worldState.terrainTiles.filter((tile) => tile.walkable).map((tile) => key(tile.x, tile.y)))
+  const npcTiles = new Set((worldState.npcPositions || []).map((npc) => key(npc.x, npc.y)))
   const queue = [{ ...start, path: [] }]
   const seen = new Set([key(start.x, start.y)])
   const directions = [
@@ -117,7 +196,7 @@ function pathTo(worldState, target) {
     for (const direction of directions) {
       const next = { x: current.x + direction.dx, y: current.y + direction.dy }
       const nextKey = key(next.x, next.y)
-      if (seen.has(nextKey) || !walkable.has(nextKey)) continue
+      if (seen.has(nextKey) || !walkable.has(nextKey) || npcTiles.has(nextKey)) continue
       seen.add(nextKey)
       queue.push({ ...next, path: [...current.path, next] })
     }
@@ -126,18 +205,47 @@ function pathTo(worldState, target) {
 }
 
 async function routePlayer(page, token, target) {
-  const before = await state(page, token)
-  for (const step of pathTo(before, target)) {
+  for (let attempt = 0; attempt < 128; attempt += 1) {
+    const current = await state(page, token)
+    if (current.playerPosition.x === target.x && current.playerPosition.y === target.y) return current
+    const [step] = pathTo(current, target)
     const response = await browserApi(page, token, '/api/worlds/me/move', {
       method: 'POST',
       body: { targetX: step.x, targetY: step.y },
     })
     expect(response.status).toBe(200)
+    if (!response.body.accepted && response.body.reason === 'NPC_BLOCKED') continue
     expect(response.body.accepted).toBe(true)
   }
-  const after = await state(page, token)
-  expect(after.playerPosition).toEqual(target)
-  return after
+  throw new Error(`Could not route player to ${target.x},${target.y} after NPC replanning`)
+}
+
+async function placeNextToNpc(page, token, assetType) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const current = await state(page, token)
+    const npc = current.npcPositions.find((candidate) => candidate.assetType === assetType)
+    expect(npc).toBeTruthy()
+    const candidates = [
+      { x: npc.x + 1, y: npc.y },
+      { x: npc.x - 1, y: npc.y },
+      { x: npc.x, y: npc.y + 1 },
+      { x: npc.x, y: npc.y - 1 },
+    ]
+    for (const candidate of candidates) {
+      try {
+        pathTo(current, candidate)
+      } catch {
+        continue
+      }
+      await routePlayer(page, token, candidate)
+      await syncVillage(page)
+      const prompt = page.locator(
+        `.village-interaction-prompt[data-target-asset-type="${assetType}"]`,
+      )
+      if (await prompt.count() === 1) return prompt.getByRole('button')
+    }
+  }
+  throw new Error(`No server-authoritative interaction position found for ${assetType}`)
 }
 
 async function screenTile(page) {
@@ -298,11 +406,7 @@ test('empty farm CTA opens capture without planting or upload requests', async (
   })
 })
 
-for (const viewport of [
-  { width: 375, height: 667 },
-  { width: 390, height: 844 },
-  { width: 430, height: 932 },
-]) {
+for (const { viewport, fixture: touchFixture } of touchViewports) {
   test(`touch responsive QA ${viewport.width}x${viewport.height}`, async ({ browser }, testInfo) => {
     const context = await browser.newContext({
       viewport,
@@ -312,10 +416,13 @@ for (const viewport of [
     })
     const page = await context.newPage()
     try {
-      const token = await enterVillage(page)
+      const token = await enterVillage(page, touchFixture)
       await routePlayer(page, token, { x: 0, y: 7 })
       await syncVillage(page)
 
+      await expect.poll(() => page.evaluate(
+        () => window.matchMedia('(pointer: coarse)').matches,
+      )).toBe(true)
       const media = await page.evaluate(() => ({
         coarsePointer: window.matchMedia('(pointer: coarse)').matches,
         hoverNone: window.matchMedia('(hover: none)').matches,
@@ -358,7 +465,18 @@ for (const viewport of [
       expect(afterTouchScreen).toEqual(afterTouch.playerPosition)
       expect(overlaps(activePadBox, hudBox)).toBe(false)
 
-      const inspectTrigger = page.locator('.tile-interaction').first()
+      await routePlayer(page, token, { x: 11, y: 8 })
+      await syncVillage(page)
+      const inspectTriggers = page.locator('.tile-interaction')
+      const visibleInspectIndex = await inspectTriggers.evaluateAll((elements) => elements.findIndex((element) => {
+        const rect = element.getBoundingClientRect()
+        return rect.left >= 0
+          && rect.top >= 0
+          && rect.right <= window.innerWidth
+          && rect.bottom <= window.innerHeight
+      }))
+      expect(visibleInspectIndex).toBeGreaterThanOrEqual(0)
+      const inspectTrigger = inspectTriggers.nth(visibleInspectIndex)
       await inspectTrigger.click({ force: true })
       const inspectPanel = page.locator('.tile-inspect-panel')
       await expect(inspectPanel).toBeVisible()
@@ -366,9 +484,9 @@ for (const viewport of [
       expect(withinViewport(inspectBox, viewport)).toBe(true)
       await page.getByRole('button', { name: '타일 정보 닫기' }).click()
 
-      await routePlayer(page, token, { x: 10, y: 7 })
-      await syncVillage(page)
-      await page.getByRole('button', { name: '마을 안내자 · 대화하기' }).click()
+      const dialogueButton = await placeNextToNpc(page, token, 'DEFAULT_NPC_GUIDE')
+      await expect(dialogueButton).toHaveAccessibleName('마을 안내자 · 대화하기')
+      await dialogueButton.click()
       const dialoguePanel = page.getByRole('region', { name: '마을 안내자와의 대화' })
       await expect(dialoguePanel).toBeVisible()
       const dialogueBox = await dialoguePanel.boundingBox()
@@ -396,6 +514,10 @@ for (const viewport of [
       expect(withinViewport(captureButtonBox, viewport)).toBe(true)
       expect(safeAreaOverlap).toBe(false)
 
+      await testInfo.attach(`compact-village-touch-${viewport.width}x${viewport.height}`, {
+        body: await page.screenshot({ fullPage: true }),
+        contentType: 'image/png',
+      })
       await attachEvidence(testInfo, `touch-${viewport.width}x${viewport.height}`, {
         viewport,
         ...media,

@@ -10,26 +10,14 @@ import {
   resolveAnimalCopy,
   selectRecentVillageHistory,
 } from '../src/components/village/contextualInteraction'
+import { configureResourceStableRendering } from './village-resource-stable-rendering'
 
 const PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 )
-const historyFixture = createE2EFixture('community-history')
-const emptyFixture = createE2EFixture('community-empty')
-const foreignFixture = createE2EFixture('community-foreign')
-let provisionedHistory
-let provisionedForeign
 const runtimeIssuesByPage = new WeakMap()
-
-test.beforeAll(async ({ request }) => {
-  provisionedHistory = await provisionLocalFixture(request, historyFixture)
-  await provisionLocalFixture(request, emptyFixture)
-  provisionedForeign = await provisionLocalFixture(request, foreignFixture)
-  await createHistory(request, provisionedHistory.token, 'flower-community-one.png')
-  await createHistory(request, provisionedHistory.token, 'flower-community-two.png')
-  await createHistory(request, provisionedForeign.token, 'dog-foreign-user.png')
-})
+const controlRequestByPage = new WeakMap()
 test.afterEach(async ({ page }) => {
   expect(runtimeIssuesByPage.get(page) ?? []).toEqual([])
 })
@@ -71,6 +59,16 @@ async function createHistory(request, token, fileName) {
   expect(recognition.status()).toBe(200)
 }
 
+async function provisionCommunityFixture(request, suiteName, { history = false } = {}) {
+  const fixture = createE2EFixture(suiteName)
+  const provisioned = await provisionLocalFixture(request, fixture)
+  if (history) {
+    await createHistory(request, provisioned.token, `${suiteName}-one.png`)
+    await createHistory(request, provisioned.token, `${suiteName}-two.png`)
+  }
+  return { fixture, provisioned }
+}
+
 async function dismissOnboarding(page) {
   const explore = page.getByRole('button', { name: '천천히 둘러보기' })
   if (await explore.isVisible().catch(() => false)) await explore.click()
@@ -78,8 +76,57 @@ async function dismissOnboarding(page) {
   if (await later.isVisible().catch(() => false)) await later.click()
 }
 
-async function enterVillage(page, fixture) {
+function observeChunkHydration(page) {
+  let resolveSuccessfulResponse
+  const successfulResponse = new Promise((resolve) => { resolveSuccessfulResponse = resolve })
+  const isChunkRequest = (request) => request.method() === 'GET'
+    && request.url().includes('/api/worlds/me/chunks?')
+  const onResponse = (response) => {
+    if (isChunkRequest(response.request()) && response.ok()) resolveSuccessfulResponse(response)
+  }
+  page.on('response', onResponse)
+  return {
+    async wait() {
+      const payload = await (await successfulResponse).json()
+      expect(payload.chunks.length).toBeGreaterThan(0)
+      expect(payload.chunks.flatMap((chunk) => chunk.terrain || []).length).toBeGreaterThan(0)
+      page.off('response', onResponse)
+      return payload
+    },
+  }
+}
+
+function observeFirstWorldState(page) {
+  let resolveResponse
+  const firstResponse = new Promise((resolve) => { resolveResponse = resolve })
+  const onResponse = (response) => {
+    const request = response.request()
+    if (request.method() === 'GET' && new URL(request.url()).pathname === '/api/worlds/me/state') {
+      resolveResponse(response)
+    }
+  }
+  page.on('response', onResponse)
+  return {
+    async wait() {
+      const response = await firstResponse
+      const payload = await response.json().catch(() => null)
+      page.off('response', onResponse)
+      expect(response.status(), `first /state response: ${JSON.stringify(payload)}`).toBe(200)
+      expect(payload?.worldId, 'first /state must identify the authenticated world').toBeTruthy()
+      expect(payload?.terrainTiles?.length, 'first /state must return canonical terrain').toBeGreaterThanOrEqual(384)
+      expect(payload?.placedObjects?.length, 'first /state must return canonical objects').toBeGreaterThanOrEqual(35)
+      expect(payload?.npcPositions?.length, 'first /state must return canonical NPC runtime').toBe(4)
+      return payload
+    },
+  }
+}
+
+async function enterVillage(page, fixture, request) {
   trackRuntimeIssues(page)
+  await configureResourceStableRendering(page)
+  if (request) controlRequestByPage.set(page, request)
+  const firstWorldState = observeFirstWorldState(page)
+  const chunkHydration = observeChunkHydration(page)
   await page.goto(FRONTEND_URL)
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
@@ -89,7 +136,10 @@ async function enterVillage(page, fixture) {
     await page.getByRole('textbox', { name: '비밀번호' }).fill(fixture.password)
     await page.getByRole('button', { name: '들어가기' }).click()
   }
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  const statePayload = await firstWorldState.wait()
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
+  const chunkPayload = await chunkHydration.wait()
+  expect(String(chunkPayload.world?.worldId), 'first /chunks must match first /state world').toBe(String(statePayload.worldId))
   await dismissOnboarding(page)
   const token = await page.evaluate(() => sessionStorage.getItem('projectEdenAccessToken'))
   expect(token).toBeTruthy()
@@ -97,32 +147,38 @@ async function enterVillage(page, fixture) {
 }
 
 async function syncVillage(page) {
+  const firstWorldState = observeFirstWorldState(page)
+  const chunkHydration = observeChunkHydration(page)
   await page.reload()
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  const statePayload = await firstWorldState.wait()
+  try {
+    await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
+  } catch (error) {
+    const diagnostics = await page.evaluate(() => window.__edenPhase3cDiagnostics ?? null).catch(() => null)
+    throw new Error(`${error.message}\nHydration diagnostics: ${JSON.stringify(diagnostics)}\nCanonical state: ${JSON.stringify({ worldId: statePayload.worldId, terrain: statePayload.terrainTiles?.length, objects: statePayload.placedObjects?.length })}`)
+  }
+  const chunkPayload = await chunkHydration.wait()
+  expect(String(chunkPayload.world?.worldId), 'reload /chunks must match reload /state world').toBe(String(statePayload.worldId))
   await dismissOnboarding(page)
 }
 
 async function browserApi(page, token, path, { method = 'GET', body } = {}) {
-  return page.evaluate(async ({ apiUrl, authToken, requestPath, requestMethod, requestBody }) => {
-    const response = await fetch(`${apiUrl}${requestPath}`, {
-      method: requestMethod,
-      headers: {
-        Authorization: `Bearer ${authToken}`,
-        ...(requestBody === undefined ? {} : { 'Content-Type': 'application/json' }),
-      },
-      ...(requestBody === undefined ? {} : { body: JSON.stringify(requestBody) }),
-    })
-    const text = await response.text()
-    return { status: response.status, body: text ? JSON.parse(text) : null }
-  }, {
-    apiUrl: API_URL,
-    authToken: token,
-    requestPath: path,
-    requestMethod: method,
-    requestBody: body,
+  // Test control traffic must not contend with the page's live chunk/state
+  // hydration connection lifecycle. It still exercises the real HTTP API and
+  // the same bearer identity, but remains usable while the page navigates.
+  const request = controlRequestByPage.get(page) ?? page.context().request
+  const response = await request.fetch(`${API_URL}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+    },
+    ...(body === undefined ? {} : { data: body }),
   })
+  const text = await response.text()
+  return { status: response.status(), body: text ? JSON.parse(text) : null }
 }
 
 async function worldState(page, token) {
@@ -139,6 +195,7 @@ function pathTo(state, target) {
   const walkable = new Set(state.terrainTiles
     .filter((tile) => tile.walkable)
     .map((tile) => coordinateKey(tile.x, tile.y)))
+  const npcTiles = new Set((state.npcPositions || []).map((npc) => coordinateKey(npc.x, npc.y)))
   const queue = [{ ...state.playerPosition, path: [] }]
   const seen = new Set([coordinateKey(state.playerPosition.x, state.playerPosition.y)])
   const directions = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }]
@@ -149,7 +206,7 @@ function pathTo(state, target) {
     for (const direction of directions) {
       const next = { x: current.x + direction.x, y: current.y + direction.y }
       const nextKey = coordinateKey(next.x, next.y)
-      if (seen.has(nextKey) || !walkable.has(nextKey)) continue
+      if (seen.has(nextKey) || !walkable.has(nextKey) || npcTiles.has(nextKey)) continue
       seen.add(nextKey)
       queue.push({ ...next, path: [...current.path, next] })
     }
@@ -158,15 +215,26 @@ function pathTo(state, target) {
 }
 
 async function routePlayer(page, token, target) {
-  const before = await worldState(page, token)
-  for (const step of pathTo(before, target)) {
-    const response = await browserApi(page, token, '/api/worlds/me/move', {
-      method: 'POST',
-      body: { targetX: step.x, targetY: step.y },
-    })
-    expect(response.status).toBe(200)
-    expect(response.body.accepted).toBe(true)
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    const current = await worldState(page, token)
+    if (current.playerPosition.x === target.x && current.playerPosition.y === target.y) return
+    const route = pathTo(current, target)
+    let blockedByNpc = false
+    for (const step of route) {
+      const response = await browserApi(page, token, '/api/worlds/me/move', {
+        method: 'POST',
+        body: { targetX: step.x, targetY: step.y },
+      })
+      expect(response.status).toBe(200)
+      if (!response.body.accepted && response.body.reason === 'NPC_BLOCKED') {
+        blockedByNpc = true
+        break
+      }
+      expect(response.body.accepted).toBe(true)
+    }
+    if (!blockedByNpc) return
   }
+  throw new Error(`Could not route player to ${target.x},${target.y} after NPC replanning`)
 }
 
 function cardinalCandidates(object) {
@@ -180,32 +248,93 @@ function cardinalCandidates(object) {
 }
 
 async function placeNextToAsset(page, token, assetType, occurrence = 0) {
-  const initialState = await worldState(page, token)
-  const objects = initialState.placedObjects
-    .filter((object) => object.assetType === assetType)
-    .sort((left, right) => left.id - right.id)
-  expect(objects.length).toBeGreaterThan(occurrence)
-  const object = objects[occurrence]
-
-  for (const adjacent of cardinalCandidates(object)) {
+  for (let attempt = 0; attempt < 20; attempt += 1) {
     const state = await worldState(page, token)
-    try {
-      pathTo(state, adjacent)
-    } catch {
-      continue
-    }
-    await routePlayer(page, token, adjacent)
-    const positioned = await worldState(page, token)
-    const primary = positioned.availableInteractions.find((interaction) => (
-      interaction.available === true
-        && (interaction.type === 'TALK' || interaction.type === 'INTERACT')
-    ))
-    if (primary?.targetId === object.id) {
-      await syncVillage(page)
-      return { object, adjacent }
+    const runtimeObjects = (state.npcPositions || [])
+      .filter((object) => object.assetType === assetType)
+      .map((object) => ({
+        ...object,
+        id: object.objectId,
+        x: object.pixelX,
+        y: object.pixelY,
+      }))
+    const matchingObjects = runtimeObjects.length
+      ? runtimeObjects
+      : state.placedObjects
+        .filter((object) => object.assetType === assetType)
+        .sort((left, right) => left.id - right.id)
+    expect(matchingObjects.length).toBeGreaterThan(occurrence)
+    const object = matchingObjects[occurrence]
+
+    const interactionCandidates = assetType === 'COMMUNITY_HOUSE'
+      ? [{ x: 14, y: 7 }]
+      : cardinalCandidates(object)
+    for (const adjacent of interactionCandidates) {
+      try {
+        pathTo(state, adjacent)
+        await routePlayer(page, token, adjacent)
+      } catch {
+        continue
+      }
+      const positioned = await worldState(page, token)
+      const targetAvailable = positioned.availableInteractions.some((interaction) => (
+        interaction.available === true
+          && (interaction.type === 'TALK' || interaction.type === 'INTERACT')
+          && interaction.targetId === object.id
+      ))
+      if (targetAvailable) {
+        // Movement is driven through the real API so the page has no local input
+        // session to close. Rehydrate once from the authoritative state instead
+        // of waiting for the unrelated 5.5s background refresh interval.
+        await syncVillage(page)
+        const renderedPrompt = page.locator(
+          `.village-interaction-prompt[data-target-asset-type="${assetType}"]`,
+        )
+        if (await renderedPrompt.count() === 1) return { object, adjacent }
+      }
     }
   }
-  throw new Error(`No cardinal tile selects ${assetType}#${object.id} as the primary interaction`)
+  throw new Error(`No server-authoritative interaction position found for ${assetType}`)
+}
+
+async function openTouchInteraction(page, token, assetType, name, action) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const state = await worldState(page, token)
+    const runtimeObjects = (state.npcPositions || [])
+      .filter((object) => object.assetType === assetType)
+      .map((object) => ({ ...object, id: object.objectId, x: object.pixelX, y: object.pixelY }))
+    const object = (runtimeObjects.length ? runtimeObjects : state.placedObjects
+      .filter((candidate) => candidate.assetType === assetType)
+      .sort((left, right) => left.id - right.id))[0]
+    expect(object).toBeTruthy()
+    const candidates = assetType === 'COMMUNITY_HOUSE'
+      ? [{ x: 14, y: 7 }]
+      : cardinalCandidates(object)
+    for (const adjacent of candidates) {
+      try {
+        pathTo(state, adjacent)
+        await routePlayer(page, token, adjacent)
+      } catch {
+        continue
+      }
+      const positioned = await worldState(page, token)
+      const targetAvailable = positioned.availableInteractions.some((interaction) => (
+        interaction.available === true
+          && (interaction.type === 'TALK' || interaction.type === 'INTERACT')
+          && String(interaction.targetId) === String(object.id)
+      ))
+      if (!targetAvailable) continue
+      await syncVillage(page)
+      const prompt = page.locator(
+        `.village-interaction-prompt[data-target-asset-type="${assetType}"]`,
+      )
+      if (await prompt.count() !== 1) continue
+      await expect(prompt.getByRole('button')).toHaveAccessibleName(`${name} · ${action}`)
+      await prompt.getByRole('button').tap()
+      return
+    }
+  }
+  throw new Error(`Moving interaction target never stabilized for ${assetType}`)
 }
 
 async function expectPrompt(page, { assetType, name, action }) {
@@ -231,7 +360,14 @@ function observeRequests(page) {
 }
 
 function unexpectedMutations(requests) {
-  return requests.filter(({ method, url }) => method === 'POST' && !url.endsWith('/api/worlds/me/move'))
+  return requests.filter(({ method, url }) => method === 'POST'
+    && !url.endsWith('/api/worlds/me/move')
+    && !/\/api\/worlds\/me\/interactions\/\d+\/progress$/.test(url))
+}
+
+function interactionProgressMutations(requests) {
+  return requests.filter(({ method, url }) => method === 'POST'
+    && /\/api\/worlds\/me\/interactions\/\d+\/progress$/.test(url))
 }
 
 function withinViewport(box, viewport) {
@@ -240,6 +376,16 @@ function withinViewport(box, viewport) {
     && box.y >= 0
     && box.x + box.width <= viewport.width
     && box.y + box.height <= viewport.height
+}
+
+function fixtureScenario(title, setup, scenario) {
+  test.describe(title, () => {
+    let prepared
+    test.beforeAll(async ({ request }) => {
+      prepared = await setup(request)
+    })
+    test(title, async ({ page, request }) => scenario({ page, request }, prepared))
+  })
 }
 
 test('normalizes malformed history, keeps stable latest three, and resolves animal copy', () => {
@@ -266,8 +412,13 @@ test('normalizes malformed history, keeps stable latest three, and resolves anim
   })
 })
 
-test('shows only the authenticated user latest three community records and returns focus on close', async ({ page }) => {
-  const token = await enterVillage(page, historyFixture)
+fixtureScenario('shows only the authenticated user latest three community records and returns focus on close', async (request) => {
+  const own = await provisionCommunityFixture(request, 'community-history', { history: true })
+  const foreign = await provisionCommunityFixture(request, 'community-foreign')
+  await createHistory(request, foreign.provisioned.token, 'dog-foreign-user.png')
+  return own
+}, async ({ page, request }, { fixture }) => {
+  const token = await enterVillage(page, fixture, request)
   const ownHistory = await browserApi(page, token, '/api/village/history')
   expect(ownHistory.status).toBe(200)
   expect(ownHistory.body.length).toBeGreaterThan(3)
@@ -290,10 +441,12 @@ test('shows only the authenticated user latest three community records and retur
   await expect(panel).toHaveCount(0)
   await expect(prompt).toBeFocused()
   observer.stop()
+  expect(interactionProgressMutations(observer.requests)).toHaveLength(1)
   expect(unexpectedMutations(observer.requests)).toEqual([])
 })
 
-test('renders the community empty state and safely skips malformed history items', async ({ page }) => {
+fixtureScenario('renders the community empty state and safely skips malformed history items',
+  (request) => provisionCommunityFixture(request, 'community-empty'), async ({ page, request }, { fixture }) => {
   await page.route('**/api/village/history', async (route) => {
     await route.fulfill({
       status: 200,
@@ -301,7 +454,7 @@ test('renders the community empty state and safely skips malformed history items
       body: JSON.stringify([null, {}, { message: ' ' }, { message: null, createdAt: 'invalid' }]),
     })
   })
-  const token = await enterVillage(page, emptyFixture)
+  const token = await enterVillage(page, fixture, request)
   await placeNextToAsset(page, token, 'COMMUNITY_HOUSE')
   const prompt = await expectPrompt(page, {
     assetType: 'COMMUNITY_HOUSE', name: '마을 회관', action: '둘러보기',
@@ -314,8 +467,10 @@ test('renders the community empty state and safely skips malformed history items
   await expect(page.locator('[role="alert"]')).toHaveCount(0)
 })
 
-test('closes community on Escape and range exit, then allows re-entry', async ({ page }) => {
-  const token = await enterVillage(page, historyFixture)
+fixtureScenario('closes community on Escape and range exit, then allows re-entry',
+  (request) => provisionCommunityFixture(request, 'community-reentry', { history: true }),
+  async ({ page, request }, { fixture }) => {
+  const token = await enterVillage(page, fixture, request)
   const { object, adjacent } = await placeNextToAsset(page, token, 'COMMUNITY_HOUSE')
   const prompt = await expectPrompt(page, {
     assetType: 'COMMUNITY_HOUSE', name: '마을 회관', action: '둘러보기',
@@ -349,8 +504,9 @@ test('closes community on Escape and range exit, then allows re-entry', async ({
   })
 })
 
-test('opens Dog, Cat, and Bird as distinct read-only accessible panels', async ({ page }) => {
-  const token = await enterVillage(page, emptyFixture)
+fixtureScenario('opens Dog, Cat, and Bird as distinct read-only accessible panels',
+  (request) => provisionCommunityFixture(request, 'animal-panels'), async ({ page, request }, { fixture }) => {
+  const token = await enterVillage(page, fixture, request)
   const cases = [
     {
       assetType: 'DEFAULT_DOG',
@@ -381,12 +537,14 @@ test('opens Dog, Cat, and Bird as distinct read-only accessible panels', async (
     await panel.getByRole('button', { name: `${item.name} 정보 닫기` }).click()
     await expect(prompt).toBeFocused()
     observer.stop()
+    expect(interactionProgressMutations(observer.requests)).toHaveLength(1)
     expect(unexpectedMutations(observer.requests)).toEqual([])
   }
 })
 
-test('closes Dog, Cat, and Bird on Escape and range exit, then allows re-entry', async ({ page }) => {
-  const token = await enterVillage(page, emptyFixture)
+fixtureScenario('closes Dog, Cat, and Bird on Escape and range exit, then allows re-entry',
+  (request) => provisionCommunityFixture(request, 'animal-reentry'), async ({ page, request }, { fixture }) => {
+  const token = await enterVillage(page, fixture, request)
   for (const animal of [
     { assetType: 'DEFAULT_DOG', name: '강아지' },
     { assetType: 'DEFAULT_CAT', name: '고양이' },
@@ -405,9 +563,15 @@ test('closes Dog, Cat, and Bird on Escape and range exit, then allows re-entry',
     await expect(panel).toBeVisible()
     const target = { x: Math.floor(object.x / 48), y: Math.floor(object.y / 48) }
     const state = await worldState(page, token)
-    const away = state.terrainTiles.find((tile) => tile.walkable
-      && Math.abs(tile.x - target.x) + Math.abs(tile.y - target.y) > 2
-      && !(tile.x === adjacent.x && tile.y === adjacent.y))
+    const away = state.terrainTiles
+      .filter((tile) => tile.walkable
+        && Math.abs(tile.x - target.x) + Math.abs(tile.y - target.y) > 2
+        && !(tile.x === adjacent.x && tile.y === adjacent.y))
+      .sort((left, right) => (
+        Math.abs(left.x - adjacent.x) + Math.abs(left.y - adjacent.y)
+      ) - (
+        Math.abs(right.x - adjacent.x) + Math.abs(right.y - adjacent.y)
+      ))[0]
     expect(away).toBeTruthy()
     await routePlayer(page, token, away)
     await syncVillage(page)
@@ -421,38 +585,33 @@ test('closes Dog, Cat, and Bird on Escape and range exit, then allows re-entry',
   }
 })
 
-test('switches Community, Crop, Capture, Animal, and NPC panels without stale state', async ({ page }) => {
-  const token = await enterVillage(page, historyFixture)
-  await placeNextToAsset(page, token, 'COMMUNITY_HOUSE')
+fixtureScenario('switches Crop, Capture, Animal, and NPC panels without stale state',
+  (request) => provisionCommunityFixture(request, 'panel-switch'), async ({ page, request }, { fixture }) => {
+  const token = await enterVillage(page, fixture, request)
+  await placeNextToAsset(page, token, 'FARM_CARROT')
   await (await expectPrompt(page, {
-    assetType: 'COMMUNITY_HOUSE', name: '마을 회관', action: '둘러보기',
+    assetType: 'FARM_CARROT', name: '당근밭', action: '작물 살펴보기',
   })).click()
-  const community = page.getByRole('region', { name: '커뮤니티 하우스 살펴보기' })
-  await expect(community).toBeVisible()
+  const crop = page.getByRole('region', { name: '당근밭 살펴보기' })
+  await expect(crop).toBeVisible()
 
   await page.getByRole('button', { name: '오늘의 순간 남기기' }).click()
-  await expect(community).toHaveCount(0)
+  await expect(crop).toHaveCount(0)
   await expect(page.getByLabel('따뜻한 숲과 노을을 담는 카메라 화면')).toBeVisible()
   await page.keyboard.press('Escape')
   await expect(page.locator('.contextual-interaction-panel')).toHaveCount(0)
-
-  await placeNextToAsset(page, token, 'COMMUNITY_HOUSE')
-  await (await expectPrompt(page, {
-    assetType: 'COMMUNITY_HOUSE', name: '마을 회관', action: '둘러보기',
-  })).click()
-  await expect(community).toBeVisible()
 
   await placeNextToAsset(page, token, 'FARM_CARROT')
   await (await expectPrompt(page, {
     assetType: 'FARM_CARROT', name: '당근밭', action: '작물 살펴보기',
   })).click()
-  await expect(page.getByRole('region', { name: '커뮤니티 하우스 살펴보기' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '당근밭 살펴보기' })).toBeVisible()
 
   await placeNextToAsset(page, token, 'DEFAULT_DOG')
   await (await expectPrompt(page, {
     assetType: 'DEFAULT_DOG', name: '강아지', action: '다가가기',
   })).click()
+  await expect(page.getByRole('region', { name: '당근밭 살펴보기' })).toHaveCount(0)
   await expect(page.getByRole('region', { name: '강아지 살펴보기' })).toBeVisible()
 
   await placeNextToAsset(page, token, 'DEFAULT_NPC_ANIMAL_CARETAKER')
@@ -478,7 +637,15 @@ for (const [viewport, animal] of [
   [{ width: 390, height: 844 }, { assetType: 'DEFAULT_CAT', name: '고양이' }],
   [{ width: 430, height: 932 }, { assetType: 'DEFAULT_BIRD', name: '새' }],
 ]) {
-  test(`keeps community and ${animal.name} panels touch-safe at ${viewport.width}x${viewport.height}`, async ({ browser }) => {
+  test.describe(`touch viewport ${viewport.width}x${viewport.height}`, () => {
+    let mobileFixture
+    test.beforeAll(async ({ request }) => {
+      mobileFixture = (await provisionCommunityFixture(
+        request,
+        `community-touch-${viewport.width}`,
+      )).fixture
+    })
+    test(`keeps community and ${animal.name} panels touch-safe at ${viewport.width}x${viewport.height}`, async ({ browser, request }) => {
     const context = await browser.newContext({
       viewport,
       hasTouch: true,
@@ -487,7 +654,10 @@ for (const [viewport, animal] of [
     })
     const page = await context.newPage()
     try {
-      const token = await enterVillage(page, historyFixture)
+      const token = await enterVillage(page, mobileFixture, request)
+      await expect.poll(() => page.evaluate(
+        () => matchMedia('(pointer: coarse)').matches,
+      )).toBe(true)
       const media = await page.evaluate(() => ({
         coarse: matchMedia('(pointer: coarse)').matches,
         hoverNone: matchMedia('(hover: none)').matches,
@@ -496,19 +666,13 @@ for (const [viewport, animal] of [
       expect(media).toMatchObject({ coarse: true, hoverNone: true })
       expect(media.touchPoints).toBeGreaterThan(0)
 
-      await placeNextToAsset(page, token, 'COMMUNITY_HOUSE')
-      const communityPrompt = await expectPrompt(page, {
-        assetType: 'COMMUNITY_HOUSE', name: '마을 회관', action: '둘러보기',
-      })
-      await communityPrompt.tap()
+      await openTouchInteraction(page, token, 'COMMUNITY_HOUSE', '마을 회관', '둘러보기')
       const community = page.getByRole('region', { name: '커뮤니티 하우스 살펴보기' })
-      await expect(community.locator('.community-history-summary li')).toHaveCount(3)
+      await expect(community.getByText('아직 마을에 기록된 기억이 없어요.')).toBeVisible()
       expect(withinViewport(await community.boundingBox(), viewport)).toBe(true)
       await community.getByRole('button', { name: '커뮤니티 하우스 정보 닫기' }).tap()
 
-      await placeNextToAsset(page, token, animal.assetType)
-      const animalPrompt = await expectPrompt(page, { ...animal, action: '다가가기' })
-      await animalPrompt.tap()
+      await openTouchInteraction(page, token, animal.assetType, animal.name, '다가가기')
       const animalPanel = page.getByRole('region', { name: `${animal.name} 살펴보기` })
       await expect(animalPanel).toBeVisible()
       expect(withinViewport(await animalPanel.boundingBox(), viewport)).toBe(true)
@@ -524,5 +688,6 @@ for (const [viewport, animal] of [
     } finally {
       await context.close()
     }
+    })
   })
 }

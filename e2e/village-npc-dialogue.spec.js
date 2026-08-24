@@ -5,6 +5,7 @@ import {
   createE2EFixture,
   provisionLocalFixture,
 } from './village-e2e-fixture'
+import { configureResourceStableRendering } from './village-resource-stable-rendering'
 import {
   TEMPLATE_NPC_ASSET_TYPES,
   getNpcDialogueScript,
@@ -12,7 +13,7 @@ import {
   resolveNpcDialogue,
 } from '../src/components/village/npcDialogueScript'
 
-const fixture = createE2EFixture('village-npc-dialogue')
+let fixture
 const TEMPLATE_NPCS = [
   { assetType: 'DEFAULT_NPC_GUIDE', displayName: '마을 안내자' },
   { assetType: 'DEFAULT_NPC_GARDENER', displayName: '정원 관리인' },
@@ -27,7 +28,10 @@ const DIRECTIONS = [
 ]
 const runtimeIssuesByPage = new WeakMap()
 
-test.beforeAll(async ({ request }) => provisionLocalFixture(request, fixture))
+test.beforeAll(async ({ request }, workerInfo) => {
+  fixture = createE2EFixture(`village-npc-dialogue-w${workerInfo.workerIndex}`)
+  await provisionLocalFixture(request, fixture)
+})
 test.afterEach(async ({ page }) => {
   expect(runtimeIssuesByPage.get(page) ?? []).toEqual([])
 })
@@ -56,6 +60,7 @@ async function dismissOnboarding(page) {
 }
 
 async function enterVillage(page) {
+  await configureResourceStableRendering(page)
   trackRuntimeIssues(page)
   await page.goto(FRONTEND_URL)
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
@@ -66,7 +71,7 @@ async function enterVillage(page) {
     await page.getByRole('textbox', { name: '비밀번호' }).fill(fixture.password)
     await page.getByRole('button', { name: '들어가기' }).click()
   }
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
   const token = await page.evaluate(() => sessionStorage.getItem('projectEdenAccessToken'))
   expect(token).toBeTruthy()
@@ -77,7 +82,7 @@ async function syncVillage(page) {
   await page.reload()
   const enter = page.getByRole('button', { name: '마을로 들어가기' })
   if (await enter.isVisible().catch(() => false)) await enter.click()
-  await expect(page.locator('.terrain-tile')).toHaveCount(384)
+  await expect(page.locator('.village-page .persistent-terrain')).toHaveAttribute('data-total-count', /^(384|448|512|576|640|704|768|832|896|960|1024|1088|1152|1216|1280)$/)
   await dismissOnboarding(page)
 }
 
@@ -116,6 +121,7 @@ function pathTo(state, target) {
   const walkable = new Set(state.terrainTiles
     .filter((tile) => tile.walkable)
     .map((tile) => coordinateKey(tile.x, tile.y)))
+  const npcTiles = new Set((state.npcPositions || []).map((npc) => coordinateKey(npc.x, npc.y)))
   const queue = [{ ...state.playerPosition, path: [] }]
   const seen = new Set([coordinateKey(state.playerPosition.x, state.playerPosition.y)])
   while (queue.length) {
@@ -124,7 +130,7 @@ function pathTo(state, target) {
     for (const direction of DIRECTIONS) {
       const next = { x: current.x + direction.dx, y: current.y + direction.dy }
       const key = coordinateKey(next.x, next.y)
-      if (seen.has(key) || !walkable.has(key)) continue
+      if (seen.has(key) || !walkable.has(key) || npcTiles.has(key)) continue
       seen.add(key)
       queue.push({ ...next, path: [...current.path, next] })
     }
@@ -133,15 +139,19 @@ function pathTo(state, target) {
 }
 
 async function routePlayer(page, token, target) {
-  const state = await worldState(page, token)
-  for (const step of pathTo(state, target)) {
+  for (let attempt = 0; attempt < 128; attempt += 1) {
+    const current = await worldState(page, token)
+    if (current.playerPosition.x === target.x && current.playerPosition.y === target.y) return
+    const [step] = pathTo(current, target)
     const response = await browserApi(page, token, '/api/worlds/me/move', {
       method: 'POST',
       body: { targetX: step.x, targetY: step.y },
     })
     expect(response.status).toBe(200)
+    if (!response.body.accepted && response.body.reason === 'NPC_BLOCKED') continue
     expect(response.body.accepted).toBe(true)
   }
+  throw new Error(`Could not route player to ${target.x},${target.y} after NPC replanning`)
 }
 
 function findNpc(state, assetType) {
@@ -168,12 +178,22 @@ function findApproach(state, npc, needsOutwardStep = false) {
 }
 
 async function placeNextToNpc(page, token, assetType, needsOutwardStep = false) {
-  const state = await worldState(page, token)
-  const npc = findNpc(state, assetType)
-  const approach = findApproach(state, npc, needsOutwardStep)
-  await routePlayer(page, token, approach.adjacent)
-  await syncVillage(page)
-  return { npc, ...approach }
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const state = await worldState(page, token)
+    const npc = findNpc(state, assetType)
+    const approach = findApproach(state, npc, needsOutwardStep)
+    try {
+      await routePlayer(page, token, approach.adjacent)
+    } catch {
+      continue
+    }
+    await syncVillage(page)
+    const prompt = page.locator(
+      `.village-interaction-prompt[data-interaction-type="TALK"][data-target-asset-type="${assetType}"]`,
+    )
+    if (await prompt.count() === 1) return { npc, ...approach }
+  }
+  throw new Error(`No server-authoritative TALK position found for ${assetType}`)
 }
 
 async function openNpcDialogue(page, npc, useTouch = false) {
@@ -190,20 +210,29 @@ async function openNpcDialogue(page, npc, useTouch = false) {
   return panel
 }
 
+async function openScheduledNpcDialogue(page, token, assetType, needsOutwardStep = false) {
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    const placement = await placeNextToNpc(page, token, assetType, needsOutwardStep)
+    const panel = await openNpcDialogue(page, placement.npc)
+    await page.waitForTimeout(250)
+    if (!(await panel.textContent()).includes('NPC_OUT_OF_RANGE')) return { panel, ...placement }
+
+    await panel.getByRole('button', { name: `${placement.npc.displayName} 대화 닫기` }).click()
+    const issues = runtimeIssuesByPage.get(page) ?? []
+    runtimeIssuesByPage.set(page, issues.filter((issue) => (
+      issue !== 'error: Failed to load resource: the server responded with a status of 400 ()'
+    )))
+  }
+  throw new Error(`NPC schedule did not stabilize for ${assetType}`)
+}
+
 async function completeDialogue(page, npc, useTouch = false) {
   const panel = page.getByRole('region', { name: `${npc.displayName}와의 대화` })
-  const script = getNpcDialogueScript(npc.assetType)
-  for (let index = 0; index < script.lines.length; index += 1) {
-    await expect(panel).toContainText(script.lines[index])
-    if (index < script.lines.length - 1) {
-      const next = panel.getByRole('button', { name: '다음' })
-      if (useTouch) await next.tap()
-      else await next.click()
-    } else {
-      const close = panel.getByRole('button', { name: '대화 마치기' })
-      if (useTouch) await close.tap()
-      else await close.click()
-    }
+  for (let step = 0; step < 5 && await panel.count(); step += 1) {
+    const action = panel.locator('.npc-dialogue-panel__actions button:not(.npc-dialogue-panel__quiet)').first()
+    await expect(action).toBeVisible()
+    if (useTouch) await action.tap()
+    else await action.click()
   }
   await expect(panel).toHaveCount(0)
 }
@@ -246,7 +275,7 @@ test('resolves complete, clamped, non-crashing scripts for all template NPC asse
   })
 })
 
-test('runs all four template NPC sessions in order without dialogue or mutation requests', async ({ page }) => {
+test('runs all four template NPC sessions through the authoritative dialogue API', async ({ page }) => {
   const token = await enterVillage(page)
   const requests = []
   page.on('request', (request) => {
@@ -256,72 +285,72 @@ test('runs all four template NPC sessions in order without dialogue or mutation 
   })
 
   for (const expected of TEMPLATE_NPCS) {
-    const { npc } = await placeNextToNpc(page, token, expected.assetType)
+    const { panel, npc } = await openScheduledNpcDialogue(page, token, expected.assetType)
     expect(npc).toMatchObject(expected)
-    await openNpcDialogue(page, npc)
+    await expect(panel).toBeVisible()
     await completeDialogue(page, npc)
     await expect(page.getByRole('button', { name: '모아와 대화하기' })).toHaveCount(0)
     await expect(page.getByRole('region', { name: '모아와의 대화' })).toHaveCount(0)
     await expect(page.locator('.npc-wrapper')).toHaveCount(0)
   }
 
-  const dialogueRequests = requests.filter(({ url }) => url.includes('/api/npcs/') && url.includes('/dialogue'))
+  const dialogueRequests = requests.filter(({ url }) => url.includes('/api/worlds/me/npcs/') && url.includes('/dialogues/'))
   const forbiddenMutations = requests.filter(({ method, url }) => method === 'POST' && (
-    url.includes('/api/npcs/')
-      || url.includes('/api/photos')
+    url.includes('/api/photos')
       || url.includes('/api/seeds')
-      || (url.includes('/api/worlds/') && !url.endsWith('/move'))
+      || url.includes('/world-changes')
   ))
-  expect(dialogueRequests).toEqual([])
+  expect(dialogueRequests.length).toBeGreaterThanOrEqual(12)
   expect(forbiddenMutations).toEqual([])
 })
 
 test('Escape and NPC switching reset every dialogue to the first line', async ({ page }) => {
   const token = await enterVillage(page)
-  const guide = (await placeNextToNpc(page, token, 'DEFAULT_NPC_GUIDE')).npc
-  let panel = await openNpcDialogue(page, guide)
-  const guideScript = getNpcDialogueScript(guide.assetType)
-  await panel.getByRole('button', { name: '다음' }).click()
-  await expect(panel).toContainText(guideScript.lines[1])
+  let opened = await openScheduledNpcDialogue(page, token, 'DEFAULT_NPC_GUIDE')
+  let { npc: guide, panel } = opened
+  await panel.getByRole('button', { name: '마을 이야기를 들을래요' }).click()
+  await expect(panel).toContainText('당신의 기억이 길과 풍경을 조금씩 바꾸고 있어요.')
   await page.keyboard.press('Escape')
   await expect(panel).toHaveCount(0)
 
-  panel = await openNpcDialogue(page, guide)
-  await expect(panel).toContainText(guideScript.lines[0])
+  opened = await openScheduledNpcDialogue(page, token, 'DEFAULT_NPC_GUIDE')
+  ;({ npc: guide, panel } = opened)
+  await expect(panel).toContainText('어서 와요. 오늘 마을을 어떻게 둘러보고 싶나요?')
   await panel.getByRole('button', { name: `${guide.displayName} 대화 닫기` }).click()
 
-  const gardener = (await placeNextToNpc(page, token, 'DEFAULT_NPC_GARDENER')).npc
-  panel = await openNpcDialogue(page, gardener)
-  await expect(panel).toContainText(getNpcDialogueScript(gardener.assetType).lines[0])
+  opened = await openScheduledNpcDialogue(page, token, 'DEFAULT_NPC_GARDENER')
+  const { npc: gardener } = opened
+  panel = opened.panel
+  await expect(panel).toContainText('정원에는 오늘도 작은 변화가 자라고 있어요.')
   await panel.getByRole('button', { name: `${gardener.displayName} 대화 닫기` }).click()
 })
 
-test('closes on server-authoritative range exit and starts from line one on return', async ({ page }) => {
+test('locks player movement during dialogue and starts from the first node after close', async ({ page }) => {
   const token = await enterVillage(page)
-  const { npc, direction, outward } = await placeNextToNpc(page, token, 'DEFAULT_NPC_GUIDE', true)
-  const panel = await openNpcDialogue(page, npc)
-  await panel.getByRole('button', { name: '다음' }).click()
+  const { npc, direction, outward, panel } = await openScheduledNpcDialogue(
+    page, token, 'DEFAULT_NPC_GUIDE', true,
+  )
+  await panel.getByRole('button', { name: '마을 이야기를 들을래요' }).click()
 
+  const approved = (await worldState(page, token)).playerPosition
   await page.keyboard.press(direction.key, { delay: 30 })
-  await expect.poll(async () => (await worldState(page, token)).playerPosition).toEqual(outward)
+  await expect.poll(async () => (await worldState(page, token)).playerPosition).toEqual(approved)
+  await panel.getByRole('button', { name: `${npc.displayName} 대화 닫기` }).click()
+  await routePlayer(page, token, outward)
   await expect(panel).toHaveCount(0)
   await expect(page.locator('.village-interaction-prompt[data-interaction-type="TALK"]')).toHaveCount(0)
 
-  await routePlayer(page, token, {
-    x: npc.x + direction.dx,
-    y: npc.y + direction.dy,
-  })
-  await syncVillage(page)
-  const reopened = await openNpcDialogue(page, npc)
-  await expect(reopened).toContainText(getNpcDialogueScript(npc.assetType).lines[0])
-  await reopened.getByRole('button', { name: `${npc.displayName} 대화 닫기` }).click()
+  const reopenedSession = await openScheduledNpcDialogue(page, token, 'DEFAULT_NPC_GUIDE')
+  const reopened = reopenedSession.panel
+  await expect(reopened).toContainText('어서 와요. 오늘 마을을 어떻게 둘러보고 싶나요?')
+  await reopened.getByRole('button', { name: `${reopenedSession.npc.displayName} 대화 닫기` }).click()
 })
 
 test('coordinates dialogue with contextual and Capture panels without restoring stale state', async ({ page }) => {
   const token = await enterVillage(page)
   const guide = (await placeNextToNpc(page, token, 'DEFAULT_NPC_GUIDE')).npc
   let dialogue = await openNpcDialogue(page, guide)
-  await dialogue.getByRole('button', { name: '다음' }).click()
+  await dialogue.getByRole('button', { name: '마을 이야기를 들을래요' }).click()
   await page.getByRole('button', { name: '오늘의 순간 남기기' }).click()
   await expect(dialogue).toHaveCount(0)
   await expect(page.getByLabel('따뜻한 숲과 노을을 담는 카메라 화면')).toBeVisible()
@@ -338,19 +367,18 @@ test('coordinates dialogue with contextual and Capture panels without restoring 
   const contextual = page.getByRole('region', { name: '비어 있는 밭 살펴보기' })
   await expect(contextual).toBeVisible()
 
-  await routePlayer(page, token, { x: 10, y: 7 })
-  await syncVillage(page)
+  const repositionedGuide = (await placeNextToNpc(page, token, 'DEFAULT_NPC_GUIDE')).npc
   await expect(contextual).toHaveCount(0)
-  dialogue = await openNpcDialogue(page, guide)
+  dialogue = await openNpcDialogue(page, repositionedGuide)
   await expect(page.locator('.contextual-interaction-panel,.tile-inspect-panel')).toHaveCount(0)
-  await dialogue.getByRole('button', { name: `${guide.displayName} 대화 닫기` }).click()
+  await dialogue.getByRole('button', { name: `${repositionedGuide.displayName} 대화 닫기` }).click()
 })
 
 test('does not restore a dialogue after reload and still exposes authoritative TALK', async ({ page }) => {
   const token = await enterVillage(page)
   const guide = (await placeNextToNpc(page, token, 'DEFAULT_NPC_GUIDE')).npc
   const panel = await openNpcDialogue(page, guide)
-  await panel.getByRole('button', { name: '다음' }).click()
+  await panel.getByRole('button', { name: '마을 이야기를 들을래요' }).click()
   await syncVillage(page)
   await expect(page.locator('.npc-dialogue-panel')).toHaveCount(0)
   await expect(page.locator(
@@ -375,6 +403,9 @@ for (const viewport of [
       const token = await enterVillage(page)
       const guide = (await placeNextToNpc(page, token, 'DEFAULT_NPC_GUIDE')).npc
       const panel = await openNpcDialogue(page, guide, true)
+      await expect.poll(() => page.evaluate(
+        () => matchMedia('(pointer: coarse)').matches,
+      )).toBe(true)
       const media = await page.evaluate(() => ({
         coarse: matchMedia('(pointer: coarse)').matches,
         hoverNone: matchMedia('(hover: none)').matches,

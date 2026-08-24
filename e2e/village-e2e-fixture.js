@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 
-export const FRONTEND_URL = 'http://localhost:5173'
-export const API_URL = 'http://localhost:8080'
+export const FRONTEND_URL = process.env.EDEN_E2E_FRONTEND_URL || 'http://localhost:5173'
+export const API_URL = process.env.EDEN_E2E_API_URL || 'http://localhost:8080'
 
 const DEFAULT_PASSWORD = process.env.EDEN_E2E_PASSWORD || 'Eden-Local-E2E-2026!'
 
