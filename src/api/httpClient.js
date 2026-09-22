@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? 'http://localhost:8080' : '')
 const TOKEN_KEY = 'projectEdenAccessToken'
 const AUTH_EXPIRED_MESSAGE = '마을로 이어지는 시간이 지나 다시 문을 열어야 합니다.'
 
