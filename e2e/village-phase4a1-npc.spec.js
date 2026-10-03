@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { WORLD_TILE_SIZE } from '../src/components/village/worldViewport'
 import { mkdirSync } from 'node:fs'
 import { WorldChunkCache } from '../src/components/village/worldChunkCache'
 import {
@@ -447,6 +448,37 @@ test('keeps NPC, player, chunks and dialogue stable for 30 seconds and cleans lo
   ]))
   expect(initialVersions.size).toBe(4)
 
+  // village-live uses the test profile. NpcCheckpointScheduler is @Profile("!test"),
+  // so this test verifies stable canonical projections, not production cadence.
+  const canonicalNpcs = (state) => state.npcPositions.map((runtimeNpc) => ({
+    objectId: runtimeNpc.objectId,
+    npcKey: runtimeNpc.npcKey,
+    assetType: runtimeNpc.assetType,
+    x: runtimeNpc.x,
+    y: runtimeNpc.y,
+    stateVersion: runtimeNpc.stateVersion,
+  })).sort((left, right) => left.objectId - right.objectId)
+  const initialNpcs = canonicalNpcs(initial)
+  const npcSamples = []
+  const assertNpcRendering = async () => {
+    const rendered = page.locator('.persistent-object.is-world-npc')
+    expect(await rendered.count()).toBeGreaterThan(0)
+    const identities = await rendered.evaluateAll((elements, tileSize) => elements.map((element) => ({
+      objectId: Number(element.dataset.worldObjectId),
+      npcKey: element.dataset.npcKey,
+      stateVersion: Number(element.dataset.npcStateVersion),
+      x: Number.parseFloat(element.style.left) / tileSize,
+      y: Number.parseFloat(element.style.top) / tileSize,
+    })), WORLD_TILE_SIZE)
+    expect(new Set(identities.map((npc) => npc.objectId)).size).toBe(identities.length)
+    // Viewport culling may render a subset; each rendered NPC must be canonical.
+    for (const identity of identities) {
+      expect(initialNpcs.find((npc) => npc.objectId === identity.objectId)).toMatchObject(identity)
+      await expect(page.locator(`.is-world-npc[data-world-object-id="${identity.objectId}"]`)).toBeVisible()
+    }
+  }
+  await assertNpcRendering()
+
   await page.evaluate(() => {
     const current = window.__edenPhase3cDiagnostics
     for (const key of Object.keys(current)) current[key] = 0
@@ -512,6 +544,7 @@ test('keeps NPC, player, chunks and dialogue stable for 30 seconds and cleans lo
   const pollPromise = (async () => {
     while (polling) {
       const state = await api(request, token, '/api/worlds/me/state')
+      npcSamples.push(canonicalNpcs(state))
       versionSamples.push(Object.fromEntries(state.npcPositions.map((runtimeNpc) => [
         String(runtimeNpc.objectId),
         runtimeNpc.stateVersion,
@@ -581,6 +614,9 @@ test('keeps NPC, player, chunks and dialogue stable for 30 seconds and cleans lo
   await page.waitForTimeout(400)
 
   const finalState = await api(request, token, '/api/worlds/me/state')
+  expect(canonicalNpcs(finalState)).toEqual(initialNpcs)
+  expect(npcSamples.length).toBeGreaterThanOrEqual(30)
+  for (const sample of npcSamples) expect(sample).toEqual(initialNpcs)
   const finalVersions = Object.fromEntries(finalState.npcPositions.map((runtimeNpc) => [
     String(runtimeNpc.objectId),
     runtimeNpc.stateVersion,
@@ -619,6 +655,9 @@ test('keeps NPC, player, chunks and dialogue stable for 30 seconds and cleans lo
 
   const { npc: logoutMayor } = await placeNextToNpc(request, token, 'NPC_MAYOR')
   await reloadVillage(page)
+  // Verify rendering after returning to an NPC-visible camera through accepted
+  // moves; the 30-second movement can cull every NPC from the final viewport.
+  await assertNpcRendering()
   const secondStartResponse = page.waitForResponse((response) => (
     response.url().includes(`/api/worlds/me/npcs/${logoutMayor.objectId}/dialogues/start`)
       && response.request().method() === 'POST'
@@ -655,8 +694,8 @@ test('keeps NPC, player, chunks and dialogue stable for 30 seconds and cleans lo
   expect(movementRequests).toBeGreaterThan(0)
   expect(maxMovementInFlight).toBe(1)
   expect(movementInFlight).toBe(0)
-  expect(Math.min(...Object.values(stateVersionDeltas))).toBeGreaterThanOrEqual(5)
-  expect(maxSampleStep).toBeLessThanOrEqual(1)
+  expect(Object.values(stateVersionDeltas)).toEqual([0, 0, 0, 0])
+  expect(maxSampleStep).toBe(0)
   expect(diagnostics.phase3.maxActiveMovementSchedulers).toBe(1)
   expect(diagnostics.phase3.activeMovementSchedulers).toBe(0)
   expect(diagnostics.phase3.maxActiveRafLoops).toBeLessThanOrEqual(1)
@@ -680,8 +719,8 @@ test('keeps NPC, player, chunks and dialogue stable for 30 seconds and cleans lo
     movementRequests,
     maxMovementInFlight,
     checkpointVersionDeltas: stateVersionDeltas,
-    processedCheckpoints: Math.min(...Object.values(stateVersionDeltas)),
-    duplicateCadenceExecutions: 0,
+    schedulerProfile: 'test (checkpoint scheduler disabled)',
+    canonicalNpcSamples: npcSamples.length,
     npcTransitions: diagnostics.npc,
     playerRafStarts: diagnostics.phase3.rafStarts,
     playerRafStops: diagnostics.phase3.rafStops,
