@@ -12,6 +12,15 @@ import {
   bridgeVisualStyle,
   communityHouseVisualStyle,
 } from '../src/components/village/worldHubLayout'
+import { WORLD_CAMERA_SCALE, WORLD_TILE_SIZE } from '../src/components/village/worldViewport'
+
+// Accepted compact sprite contract: a three-tile logical footprint at 72%.
+// Keep the helper assertion independent; DOM assertions consume its dimensions.
+const COMMUNITY_HOUSE_VISUAL_SCALE = 0.72
+const communityHouseWidth = Math.round((COMMUNITY_HOUSE.maxX - COMMUNITY_HOUSE.minX + 1)
+  * WORLD_TILE_SIZE * COMMUNITY_HOUSE_VISUAL_SCALE)
+const communityHouseHeight = Math.round((COMMUNITY_HOUSE.maxY - COMMUNITY_HOUSE.minY + 1)
+  * WORLD_TILE_SIZE * COMMUNITY_HOUSE_VISUAL_SCALE)
 
 const fixture = createE2EFixture('village-phase3b-footprint')
 const evidenceDirectory = '/private/tmp/project-eden-phase3b-closure'
@@ -80,6 +89,7 @@ async function state(page, token) {
 function pathTo(world, target) {
   const key = (x, y) => `${x}:${y}`
   const walkable = new Set(world.terrainTiles.filter((tile) => tile.walkable).map((tile) => key(tile.x, tile.y)))
+  const occupied = new Set((world.npcPositions || []).map((npc) => key(npc.x, npc.y)))
   const queue = [{ ...world.playerPosition, path: [] }]
   const seen = new Set([key(world.playerPosition.x, world.playerPosition.y)])
   while (queue.length) {
@@ -88,12 +98,12 @@ function pathTo(world, target) {
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const next = { x: current.x + dx, y: current.y + dy }
       const nextKey = key(next.x, next.y)
-      if (seen.has(nextKey) || !walkable.has(nextKey)) continue
+      if (seen.has(nextKey) || !walkable.has(nextKey) || occupied.has(nextKey)) continue
       seen.add(nextKey)
       queue.push({ ...next, path: [...current.path, next] })
     }
   }
-  throw new Error(`No walkable path to ${target.x},${target.y}`)
+  throw new Error(`No walkable, NPC-unoccupied path to ${target.x},${target.y}`)
 }
 
 async function route(page, token, target) {
@@ -103,7 +113,8 @@ async function route(page, token, target) {
       method: 'POST',
       body: { targetX: step.x, targetY: step.y },
     })
-    expect(moved.body.accepted).toBe(true)
+    expect(moved.status).toBe(200)
+    expect(moved.body.accepted, `Move to ${step.x},${step.y}: ${moved.body.reason}`).toBe(true)
   }
   expect((await state(page, token)).playerPosition).toEqual(target)
 }
@@ -125,9 +136,9 @@ test('uses one explicit bridge and community-house footprint contract', () => {
     anchorX: 14, anchorY: 6, approachX: 14, approachY: 7,
   })
   expect(communityHouseVisualStyle()).toEqual({
-    '--community-house-width': '144px',
-    '--community-house-height': '144px',
-    '--community-house-offset-x': '48px',
+    '--community-house-width': `${communityHouseWidth}px`,
+    '--community-house-height': `${communityHouseHeight}px`,
+    '--community-house-offset-x': `${Math.round(communityHouseWidth / 2)}px`,
   })
 })
 
@@ -180,20 +191,32 @@ test('aligns the community-house artwork, front door, interaction, and collision
   const house = page.locator('.asset-community_house')
   await expect(house).toBeVisible()
   await expect(page.getByRole('button', { name: '마을 회관 · 둘러보기' })).toBeVisible()
-  const visual = await house.evaluate((element) => {
+  const houseStyle = communityHouseVisualStyle()
+  const width = Number.parseFloat(houseStyle['--community-house-width'])
+  const bodyHeight = Number.parseFloat(houseStyle['--community-house-height']) / 2
+  const offsetX = Number.parseFloat(houseStyle['--community-house-offset-x'])
+  const visual = await house.evaluate((element, scale) => {
     const rect = element.getBoundingClientRect()
     const world = document.querySelector('.village-world').getBoundingClientRect()
     const worldStyle = getComputedStyle(document.querySelector('.village-world'))
     const originX = Number.parseFloat(worldStyle.getPropertyValue('--world-origin-x')) || 0
     const originY = Number.parseFloat(worldStyle.getPropertyValue('--world-origin-y')) || 0
     return {
-      left: Math.round((rect.left - world.left) / 1.1 - originX),
-      top: Math.round((rect.top - world.top) / 1.1 - originY),
-      width: Math.round(rect.width / 1.1),
-      bodyHeight: Math.round(rect.height / 1.1),
+      // Bounding rect starts at the world border; object anchors use its content.
+      left: Math.round((rect.left - world.left) / scale - originX
+        - Number.parseFloat(worldStyle.borderLeftWidth)),
+      top: Math.round((rect.top - world.top) / scale - originY
+        - Number.parseFloat(worldStyle.borderTopWidth)),
+      width: Math.round(rect.width / scale),
+      bodyHeight: Math.round(rect.height / scale),
     }
+  }, WORLD_CAMERA_SCALE)
+  expect(visual).toEqual({
+    left: COMMUNITY_HOUSE.anchorX * WORLD_TILE_SIZE - offsetX,
+    top: COMMUNITY_HOUSE.anchorY * WORLD_TILE_SIZE - bodyHeight,
+    width,
+    bodyHeight,
   })
-  expect(visual).toEqual({ left: 624, top: 216, width: 144, bodyHeight: 72 })
   await screenshot(page, '06-community-house-full')
   await screenshot(page, '07-community-house-door')
 
@@ -232,7 +255,14 @@ test('keeps both reconciled landmarks visible in a mobile camera', async ({ brow
     const token = await enterVillage(page)
     await route(page, token, { x: HUB_BRIDGE.entryX, y: HUB_BRIDGE.y })
     await syncVillage(page)
-    await expect(page.locator('.visual-bridge')).toBeVisible()
+    // P3 renders bridge planks on authoritative terrain tiles; the legacy
+    // pond decoration is hidden by the pixel hub presentation.
+    for (let x = HUB_BRIDGE.minX; x <= HUB_BRIDGE.maxX; x += 1) {
+      const plank = page.locator(`.terrain-bridge[style*="left: ${x * WORLD_TILE_SIZE}px"][style*="top: ${HUB_BRIDGE.y * WORLD_TILE_SIZE}px"]`)
+      await expect(plank).toBeVisible()
+      await expect(plank).toHaveCSS('background-image', /repeating-linear-gradient/)
+      if (x === HUB_BRIDGE.minX) await expect(plank).toBeInViewport()
+    }
     await screenshot(page, '10-mobile-bridge')
     await route(page, token, {
       x: COMMUNITY_HOUSE.approachX,
