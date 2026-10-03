@@ -778,6 +778,7 @@ body{overscroll-behavior:none;background:var(--forest-deep)}
 }
 .persistent-terrain{opacity:.22;mix-blend-mode:multiply}
 .terrain-tile{image-rendering:pixelated}
+.terrain-bridge{background:repeating-linear-gradient(90deg,#8c623d 0 9px,#d2a36b 9px 15px)}
 .terrain-road{
   background:
     radial-gradient(circle at 24% 32%,#e9c879 0 2px,transparent 3px),
