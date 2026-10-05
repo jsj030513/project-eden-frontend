@@ -764,21 +764,22 @@ body{overscroll-behavior:none;background:var(--forest-deep)}
     inset 0 0 42px rgba(30,50,22,.2);
 }
 .grass-tiles{
-  background-color:#5f9146;
-  background-image:
-    url('/art/eden-village-hub-v1.jpg'),
-    linear-gradient(90deg,rgba(43,91,39,.11) 1px,transparent 1px),
-    linear-gradient(rgba(43,91,39,.1) 1px,transparent 1px),
-    radial-gradient(circle at 15% 25%,#85ad50 0 2px,transparent 3px),
-    radial-gradient(circle at 78% 69%,#3d7138 0 2px,transparent 3px),
-    radial-gradient(circle at 56% 38%,rgba(236,203,105,.18) 0 1px,transparent 2px);
-  background-size:1152px 768px,48px 48px,48px 48px,31px 27px,43px 39px,61px 53px;
-  background-position:var(--world-origin-x,0px) var(--world-origin-y,0px),0 0,0 0,0 0,0 0,0 0;
-  background-repeat:no-repeat,repeat,repeat,repeat,repeat,repeat;
+  /* Unloaded ground only. Generated center/outer terrain shares data-driven layers. */
+  background:#789456;
 }
-.persistent-terrain{opacity:.22;mix-blend-mode:multiply}
-.terrain-tile{image-rendering:pixelated}
-.terrain-bridge{background:repeating-linear-gradient(90deg,#8c623d 0 9px,#d2a36b 9px 15px)}
+.grass-tiles::before{content:none}
+/* Opaque fallback for missing artwork, including negative world coordinates. */
+.persistent-terrain{opacity:1;mix-blend-mode:normal;overflow:visible}
+.terrain-tile,.world-tile{image-rendering:pixelated}
+.terrain-bridge{background:repeating-linear-gradient(0deg,#735738 0 3px,#a27d52 3px 21px,#bea073 21px 24px);box-shadow:none}
+.terrain-flower_field{background:radial-gradient(circle at 25% 30%,#d59a9d 0 1px,transparent 2px),radial-gradient(circle at 68% 72%,#e1bd76 0 1px,transparent 2px),#789456}
+.terrain-forest{background:radial-gradient(ellipse at 30% 25%,#789456 0 3px,transparent 4px),radial-gradient(ellipse at 75% 70%,#506142 0 2px,transparent 3px),#63764c}
+.terrain-beach{background:#d9c17e}
+.terrain-building{background:linear-gradient(135deg,#a18a66 0 48%,#80735d 49% 55%,#baa078 56%);box-shadow:none}
+.terrain-beach{background:radial-gradient(circle at 25% 35%,#ae9665 0 1px,transparent 2px),radial-gradient(circle at 70% 68%,#ddc693 0 1px,transparent 2px),#c8b07b;box-shadow:none}
+.terrain-cliff{background:radial-gradient(circle at 30% 28%,#aaa18a 0 3px,transparent 4px),radial-gradient(circle at 72% 67%,#7c786c 0 2px,transparent 3px),#938c7a;box-shadow:none}
+.pixel-terrain{position:absolute;inset:0;z-index:var(--layer-terrain,0);pointer-events:none;overflow:visible}
+.pixel-terrain__tile{position:absolute;display:block;image-rendering:pixelated;background-repeat:no-repeat;pointer-events:none}
 .terrain-road{
   background:
     radial-gradient(circle at 24% 32%,#e9c879 0 2px,transparent 3px),
@@ -944,12 +945,9 @@ body{overscroll-behavior:none;background:var(--forest-deep)}
 .template-npc-dialogue-panel .npc-dialogue-panel__actions button{min-height:44px}
 @media (prefers-reduced-motion:reduce){.persistent-object.is-world-npc{transition:none}}
 
-/* Mobile village scale correction.
-   The hub artwork already contains its centered fountain, paths, farms and pond.
-   Persistent records remain in the DOM for interaction/state, while runtime
-   sprites use the same compact pixel scale as the painted 48px terrain tiles. */
+/* The existing PLAZA record owns the fountain now that terrain and objects render together. */
 .asset-plaza{
-  opacity:0;
+  opacity:1;
   filter:none;
 }
 .asset-community_house{

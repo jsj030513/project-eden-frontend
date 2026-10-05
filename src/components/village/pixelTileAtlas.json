@@ -1,0 +1,1051 @@
+{
+  "version": 1,
+  "sourceTileSize": 16,
+  "displayTileSize": 48,
+  "palette": {
+    "grass": [
+      "#789456",
+      "#6d884e",
+      "#89a461",
+      "#a0b572"
+    ],
+    "path": [
+      "#baa078",
+      "#a18a66",
+      "#cbb18a",
+      "#dcc399"
+    ],
+    "soil": [
+      "#896344",
+      "#755439",
+      "#9e7851",
+      "#b28a60"
+    ],
+    "water": [
+      "#588e90",
+      "#4b7f84",
+      "#6b9f9d",
+      "#85b3aa"
+    ],
+    "rock-ground": [
+      "#938c7a",
+      "#7c786c",
+      "#aaa18a",
+      "#bcb29b"
+    ],
+    "flower-ground": [
+      "#789456",
+      "#6d884e",
+      "#89a461",
+      "#d59a9d",
+      "#e1bd76"
+    ],
+    "forest-ground": [
+      "#63764c",
+      "#506142",
+      "#789456",
+      "#9a895e",
+      "#8b9a65"
+    ],
+    "bridge": [
+      "#a27d52",
+      "#735738",
+      "#bea073",
+      "#d2b782",
+      "#665a49"
+    ],
+    "building-footprint": [
+      "#a18a66",
+      "#80735d",
+      "#baa078",
+      "#cbb18a"
+    ],
+    "sand": [
+      "#c8b07b",
+      "#ae9665",
+      "#ddc693",
+      "#ead8ad"
+    ],
+    "cliff": [
+      "#938c7a",
+      "#7c786c",
+      "#aaa18a",
+      "#bcb29b",
+      "#645f53"
+    ]
+  },
+  "atlases": {
+    "base": {
+      "url": "/art/pixel/terrain/terrain-atlas.png",
+      "width": 64,
+      "height": 176
+    },
+    "transitions": {
+      "url": "/art/pixel/terrain/transition-atlas.png",
+      "width": 64,
+      "height": 208
+    }
+  },
+  "families": {
+    "grass": {
+      "variants": [
+        {
+          "key": "terrain/grass/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/grass/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/grass/base/variant-2",
+          "atlas": "base",
+          "rect": {
+            "x": 32,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/grass/base/variant-3",
+          "atlas": "base",
+          "rect": {
+            "x": 48,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {}
+    },
+    "path": {
+      "variants": [
+        {
+          "key": "terrain/path/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 16,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/path/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 16,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/path/base/variant-2",
+          "atlas": "base",
+          "rect": {
+            "x": 32,
+            "y": 16,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/path/base/variant-3",
+          "atlas": "base",
+          "rect": {
+            "x": 48,
+            "y": 16,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {
+        "edge/north": {
+          "key": "terrain/path/edge/north",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/east": {
+          "key": "terrain/path/edge/east",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/south": {
+          "key": "terrain/path/edge/south",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/west": {
+          "key": "terrain/path/edge/west",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 0,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/northEast": {
+          "key": "terrain/path/outer/northEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 16,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/southEast": {
+          "key": "terrain/path/outer/southEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 16,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/southWest": {
+          "key": "terrain/path/outer/southWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 16,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/northWest": {
+          "key": "terrain/path/outer/northWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 16,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/northEast": {
+          "key": "terrain/path/inner/northEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 32,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/southEast": {
+          "key": "terrain/path/inner/southEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 32,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/southWest": {
+          "key": "terrain/path/inner/southWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 32,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/northWest": {
+          "key": "terrain/path/inner/northWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 32,
+            "width": 16,
+            "height": 16
+          }
+        }
+      }
+    },
+    "soil": {
+      "variants": [
+        {
+          "key": "terrain/soil/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 32,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/soil/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 32,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/soil/base/variant-2",
+          "atlas": "base",
+          "rect": {
+            "x": 32,
+            "y": 32,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/soil/base/variant-3",
+          "atlas": "base",
+          "rect": {
+            "x": 48,
+            "y": 32,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {
+        "edge/north": {
+          "key": "terrain/soil/edge/north",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 48,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/east": {
+          "key": "terrain/soil/edge/east",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 48,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/south": {
+          "key": "terrain/soil/edge/south",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 48,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/west": {
+          "key": "terrain/soil/edge/west",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 48,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/northEast": {
+          "key": "terrain/soil/outer/northEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/southEast": {
+          "key": "terrain/soil/outer/southEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 64,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/southWest": {
+          "key": "terrain/soil/outer/southWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 64,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/northWest": {
+          "key": "terrain/soil/outer/northWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 64,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/northEast": {
+          "key": "terrain/soil/inner/northEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 80,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/southEast": {
+          "key": "terrain/soil/inner/southEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 80,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/southWest": {
+          "key": "terrain/soil/inner/southWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 80,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/northWest": {
+          "key": "terrain/soil/inner/northWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 80,
+            "width": 16,
+            "height": 16
+          }
+        }
+      }
+    },
+    "water": {
+      "variants": [
+        {
+          "key": "terrain/water/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 48,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/water/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 48,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/water/base/variant-2",
+          "atlas": "base",
+          "rect": {
+            "x": 32,
+            "y": 48,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/water/base/variant-3",
+          "atlas": "base",
+          "rect": {
+            "x": 48,
+            "y": 48,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {
+        "edge/north": {
+          "key": "terrain/water/edge/north",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 96,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/east": {
+          "key": "terrain/water/edge/east",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 96,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/south": {
+          "key": "terrain/water/edge/south",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 96,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/west": {
+          "key": "terrain/water/edge/west",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 96,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/northEast": {
+          "key": "terrain/water/outer/northEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 112,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/southEast": {
+          "key": "terrain/water/outer/southEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 112,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/southWest": {
+          "key": "terrain/water/outer/southWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 112,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/northWest": {
+          "key": "terrain/water/outer/northWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 112,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/northEast": {
+          "key": "terrain/water/inner/northEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 128,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/southEast": {
+          "key": "terrain/water/inner/southEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 128,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/southWest": {
+          "key": "terrain/water/inner/southWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 128,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/northWest": {
+          "key": "terrain/water/inner/northWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 128,
+            "width": 16,
+            "height": 16
+          }
+        }
+      }
+    },
+    "rock-ground": {
+      "variants": [
+        {
+          "key": "terrain/rock-ground/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 64,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/rock-ground/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 64,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/rock-ground/base/variant-2",
+          "atlas": "base",
+          "rect": {
+            "x": 32,
+            "y": 64,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/rock-ground/base/variant-3",
+          "atlas": "base",
+          "rect": {
+            "x": 48,
+            "y": 64,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {}
+    },
+    "flower-ground": {
+      "variants": [
+        {
+          "key": "terrain/flower-ground/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 80,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/flower-ground/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 80,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/flower-ground/base/variant-2",
+          "atlas": "base",
+          "rect": {
+            "x": 32,
+            "y": 80,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/flower-ground/base/variant-3",
+          "atlas": "base",
+          "rect": {
+            "x": 48,
+            "y": 80,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {}
+    },
+    "forest-ground": {
+      "variants": [
+        {
+          "key": "terrain/forest-ground/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 96,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/forest-ground/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 96,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/forest-ground/base/variant-2",
+          "atlas": "base",
+          "rect": {
+            "x": 32,
+            "y": 96,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/forest-ground/base/variant-3",
+          "atlas": "base",
+          "rect": {
+            "x": 48,
+            "y": 96,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {
+        "edge/north": {
+          "key": "terrain/forest-ground/edge/north",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 144,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/east": {
+          "key": "terrain/forest-ground/edge/east",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 144,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/south": {
+          "key": "terrain/forest-ground/edge/south",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 144,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/west": {
+          "key": "terrain/forest-ground/edge/west",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 144,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/northEast": {
+          "key": "terrain/forest-ground/outer/northEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 160,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/southEast": {
+          "key": "terrain/forest-ground/outer/southEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 160,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/southWest": {
+          "key": "terrain/forest-ground/outer/southWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 160,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "outer/northWest": {
+          "key": "terrain/forest-ground/outer/northWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 160,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/northEast": {
+          "key": "terrain/forest-ground/inner/northEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 176,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/southEast": {
+          "key": "terrain/forest-ground/inner/southEast",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 176,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/southWest": {
+          "key": "terrain/forest-ground/inner/southWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 176,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "inner/northWest": {
+          "key": "terrain/forest-ground/inner/northWest",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 176,
+            "width": 16,
+            "height": 16
+          }
+        }
+      }
+    },
+    "bridge": {
+      "variants": [
+        {
+          "key": "terrain/bridge/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 112,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/bridge/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 112,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {
+        "edge/north": {
+          "key": "terrain/bridge/edge/north",
+          "atlas": "transitions",
+          "rect": {
+            "x": 0,
+            "y": 192,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/east": {
+          "key": "terrain/bridge/edge/east",
+          "atlas": "transitions",
+          "rect": {
+            "x": 16,
+            "y": 192,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/south": {
+          "key": "terrain/bridge/edge/south",
+          "atlas": "transitions",
+          "rect": {
+            "x": 32,
+            "y": 192,
+            "width": 16,
+            "height": 16
+          }
+        },
+        "edge/west": {
+          "key": "terrain/bridge/edge/west",
+          "atlas": "transitions",
+          "rect": {
+            "x": 48,
+            "y": 192,
+            "width": 16,
+            "height": 16
+          }
+        }
+      }
+    },
+    "building-footprint": {
+      "variants": [
+        {
+          "key": "terrain/building-footprint/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 128,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/building-footprint/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 128,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {}
+    },
+    "sand": {
+      "variants": [
+        {
+          "key": "terrain/sand/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 144,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/sand/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 144,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/sand/base/variant-2",
+          "atlas": "base",
+          "rect": {
+            "x": 32,
+            "y": 144,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/sand/base/variant-3",
+          "atlas": "base",
+          "rect": {
+            "x": 48,
+            "y": 144,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {}
+    },
+    "cliff": {
+      "variants": [
+        {
+          "key": "terrain/cliff/base/variant-0",
+          "atlas": "base",
+          "rect": {
+            "x": 0,
+            "y": 160,
+            "width": 16,
+            "height": 16
+          }
+        },
+        {
+          "key": "terrain/cliff/base/variant-1",
+          "atlas": "base",
+          "rect": {
+            "x": 16,
+            "y": 160,
+            "width": 16,
+            "height": 16
+          }
+        }
+      ],
+      "transitions": {}
+    }
+  }
+}
