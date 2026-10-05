@@ -19,7 +19,7 @@ function decoded(name) {
 
 test('P4-2 base rows and all pre-P5 transition pixels remain unchanged', () => {
   expect(atlas.atlases.base).toEqual({ url: '/art/pixel/terrain/terrain-atlas.png', width: 64, height: 176 })
-  expect(atlas.atlases.transitions).toEqual({ url: '/art/pixel/terrain/transition-atlas.png', width: 64, height: 208 })
+  expect(atlas.atlases.transitions).toEqual({ url: '/art/pixel/terrain/transition-atlas.png', width: 64, height: 352 })
   const { pixels } = decoded('base')
   expect(createHash('sha256').update(pixels.subarray(0, 257 * 128)).digest('hex')).toBe('a42006946d8f0f1d307e37495a319ceacffd50702c2cfc79d52d4c6d56737b0a')
   // P5 appends rows; hash the original decoded 208 rows, not the resized PNG.
@@ -67,7 +67,7 @@ test('BEACH and CLIFF stay base-only at grass, water, and rock boundaries', () =
   // P5 keeps WATER ownership while selecting the synthetic sand material.
   const water = lookupPixelTile(resolveWorldTile({ terrainType: 'WATER', neighbors: { east: 'BEACH' } }))
   expect(water.edgeMask).toBe(2)
-  expect(water.layers[0].key).toBe('terrain/water/edge/east')
+  expect(water.layers[0].key).toBe('terrain/water/sand-bank/edge/east')
 })
 
 test('real building foundation covers the full nonwalkable 3x3 footprint below the separate house object', () => {

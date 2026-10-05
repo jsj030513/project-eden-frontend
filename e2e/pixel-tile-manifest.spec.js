@@ -25,7 +25,7 @@ test('road north/east boundary selects exact edges and the outer NE corner', () 
 
 test('water supports a diagonal inner corner with no cardinal shoreline', () => {
   const visual = lookupPixelTile(resolveWorldTile({ terrainType: 'WATER', neighbors: { north: 'WATER', east: 'WATER', northEast: 'GRASS' } }))
-  expect(visual.layers[0].key).toBe('terrain/water/inner/northEast')
+  expect(visual.layers[0].key).toBe('terrain/water/grass-bank/inner/northEast')
   expect(visual.layers).toHaveLength(2)
 })
 

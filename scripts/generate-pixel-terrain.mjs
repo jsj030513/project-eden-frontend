@@ -28,6 +28,13 @@ const cardinals = ['north', 'east', 'south', 'west']
 const corners = ['northEast', 'southEast', 'southWest', 'northWest']
 const rgba = (hex) => [...hex.slice(1).match(/../g).map((part) => parseInt(part, 16)), 255]
 const colors = Object.fromEntries(families.map((family) => [family, palette[family].map(rgba)]))
+// Water-owned, low shoreline rims. Reuse Eden ground colors; the third band
+// is existing teal water, never foam, wet sand, or a vertical cliff face.
+const coastColors = {
+  'grass-bank': [colors.grass[1], colors.grass[0], colors.water[2]],
+  'sand-bank': [colors.sand[1], colors.sand[0], colors.water[2]],
+  'rock-bank': [colors['rock-ground'][1], colors['rock-ground'][0], colors.water[2]],
+}
 
 function canvas(width, height) {
   return { width, height, pixels: Buffer.alloc(width * height * 4) }
@@ -173,10 +180,12 @@ function transitionTile(family, kind, direction) {
     for (const x of [3, 11]) dot(tile, x, 1, colors.bridge[4])
     return rotate(tile, direction)
   }
-  const outside = family === 'water' ? colors.path[1] : colors.grass[0]
-  const rim = family === 'water' ? colors.path[0]
-    : family === 'forest-ground' ? colors[family][4] : colors[family][1]
-  const inside = colors[family][family === 'forest-ground' ? 0 : 2]
+  const [outside, rim, inside] = coastColors[family] ?? [
+    family === 'water' ? colors.path[1] : colors.grass[0],
+    family === 'water' ? colors.path[0]
+      : family === 'forest-ground' ? colors[family][4] : colors[family][1],
+    colors[family]?.[family === 'forest-ground' ? 0 : 2],
+  ]
   if (kind === 'edge') {
     for (let x = 0; x < size; x += 1) {
       dot(tile, x, 0, outside)
@@ -241,7 +250,8 @@ function put(sheet, tile, column, row) {
 }
 
 const base = canvas(columns * size, families.length * size)
-const transitions = canvas(columns * size, (transitionFamilies.length * 3 + 1) * size)
+const existingTransitionRows = transitionFamilies.length * 3 + 1
+const transitions = canvas(columns * size, (existingTransitionRows + Object.keys(coastColors).length * 3) * size)
 const manifest = {
   version: 1, sourceTileSize: size, displayTileSize: 48, palette,
   atlases: {
@@ -282,6 +292,23 @@ for (const [row, family] of families.entries()) {
   manifest.families[family] = entry
 }
 
+// Append below all P2/P4 slots, including the bridge row. Earth banks remain
+// in water.transitions; no duplicate earth or bridge assets are generated.
+manifest.families.water.coastTransitions = {}
+for (const [materialIndex, material] of Object.keys(coastColors).entries()) {
+  const entries = {}
+  for (const [kindIndex, kind] of ['edge', 'outer', 'inner'].entries()) {
+    for (let direction = 0; direction < 4; direction += 1) {
+      const name = (kind === 'edge' ? cardinals : corners)[direction]
+      entries[`${kind}/${name}`] = {
+        key: `terrain/water/${material}/${kind}/${name}`, atlas: 'transitions',
+        rect: put(transitions, transitionTile(material, kind, direction), direction, existingTransitionRows + materialIndex * 3 + kindIndex),
+      }
+    }
+  }
+  manifest.families.water.coastTransitions[material] = entries
+}
+
 const art = new URL('public/art/pixel/terrain/', root)
 const outputs = [
   [new URL('terrain-atlas.png', art), png(base)],
@@ -297,5 +324,6 @@ if (process.argv.includes('--check')) {
   mkdirSync(art, { recursive: true })
   for (const [path, bytes] of outputs) writeFileSync(path, bytes)
   const entries = Object.values(manifest.families)
-  console.log(`Generated ${entries.reduce((n, family) => n + family.variants.length, 0)} opaque base tiles and ${entries.reduce((n, family) => n + Object.keys(family.transitions).length, 0)} composable transition tiles in ${fileURLToPath(art)}`)
+  const coastCount = Object.values(manifest.families.water.coastTransitions).reduce((n, entries) => n + Object.keys(entries).length, 0)
+  console.log(`Generated ${entries.reduce((n, family) => n + family.variants.length, 0)} opaque base tiles and ${entries.reduce((n, family) => n + Object.keys(family.transitions).length, coastCount)} composable transition tiles in ${fileURLToPath(art)}`)
 }

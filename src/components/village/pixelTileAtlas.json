@@ -83,7 +83,7 @@
     "transitions": {
       "url": "/art/pixel/terrain/transition-atlas.png",
       "width": 64,
-      "height": 208
+      "height": 352
     }
   },
   "families": {
@@ -626,6 +626,374 @@
             "y": 128,
             "width": 16,
             "height": 16
+          }
+        }
+      },
+      "coastTransitions": {
+        "grass-bank": {
+          "edge/north": {
+            "key": "terrain/water/grass-bank/edge/north",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 208,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/east": {
+            "key": "terrain/water/grass-bank/edge/east",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 208,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/south": {
+            "key": "terrain/water/grass-bank/edge/south",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 208,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/west": {
+            "key": "terrain/water/grass-bank/edge/west",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 208,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/northEast": {
+            "key": "terrain/water/grass-bank/outer/northEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 224,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/southEast": {
+            "key": "terrain/water/grass-bank/outer/southEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 224,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/southWest": {
+            "key": "terrain/water/grass-bank/outer/southWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 224,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/northWest": {
+            "key": "terrain/water/grass-bank/outer/northWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 224,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/northEast": {
+            "key": "terrain/water/grass-bank/inner/northEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 240,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/southEast": {
+            "key": "terrain/water/grass-bank/inner/southEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 240,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/southWest": {
+            "key": "terrain/water/grass-bank/inner/southWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 240,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/northWest": {
+            "key": "terrain/water/grass-bank/inner/northWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 240,
+              "width": 16,
+              "height": 16
+            }
+          }
+        },
+        "sand-bank": {
+          "edge/north": {
+            "key": "terrain/water/sand-bank/edge/north",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 256,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/east": {
+            "key": "terrain/water/sand-bank/edge/east",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 256,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/south": {
+            "key": "terrain/water/sand-bank/edge/south",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 256,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/west": {
+            "key": "terrain/water/sand-bank/edge/west",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 256,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/northEast": {
+            "key": "terrain/water/sand-bank/outer/northEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 272,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/southEast": {
+            "key": "terrain/water/sand-bank/outer/southEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 272,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/southWest": {
+            "key": "terrain/water/sand-bank/outer/southWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 272,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/northWest": {
+            "key": "terrain/water/sand-bank/outer/northWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 272,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/northEast": {
+            "key": "terrain/water/sand-bank/inner/northEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 288,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/southEast": {
+            "key": "terrain/water/sand-bank/inner/southEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 288,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/southWest": {
+            "key": "terrain/water/sand-bank/inner/southWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 288,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/northWest": {
+            "key": "terrain/water/sand-bank/inner/northWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 288,
+              "width": 16,
+              "height": 16
+            }
+          }
+        },
+        "rock-bank": {
+          "edge/north": {
+            "key": "terrain/water/rock-bank/edge/north",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 304,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/east": {
+            "key": "terrain/water/rock-bank/edge/east",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 304,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/south": {
+            "key": "terrain/water/rock-bank/edge/south",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 304,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "edge/west": {
+            "key": "terrain/water/rock-bank/edge/west",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 304,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/northEast": {
+            "key": "terrain/water/rock-bank/outer/northEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 320,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/southEast": {
+            "key": "terrain/water/rock-bank/outer/southEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 320,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/southWest": {
+            "key": "terrain/water/rock-bank/outer/southWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 320,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "outer/northWest": {
+            "key": "terrain/water/rock-bank/outer/northWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 320,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/northEast": {
+            "key": "terrain/water/rock-bank/inner/northEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 0,
+              "y": 336,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/southEast": {
+            "key": "terrain/water/rock-bank/inner/southEast",
+            "atlas": "transitions",
+            "rect": {
+              "x": 16,
+              "y": 336,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/southWest": {
+            "key": "terrain/water/rock-bank/inner/southWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 32,
+              "y": 336,
+              "width": 16,
+              "height": 16
+            }
+          },
+          "inner/northWest": {
+            "key": "terrain/water/rock-bank/inner/northWest",
+            "atlas": "transitions",
+            "rect": {
+              "x": 48,
+              "y": 336,
+              "width": 16,
+              "height": 16
+            }
           }
         }
       }

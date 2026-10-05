@@ -25,7 +25,7 @@ function scanlines(name) {
 
 test('P4-1 appends atlas rows while preserving every P2 rectangle and pixel', () => {
   expect(atlas.atlases.base).toMatchObject({ width: 64, height: 176 })
-  expect(atlas.atlases.transitions).toMatchObject({ width: 64, height: 208 })
+  expect(atlas.atlases.transitions).toMatchObject({ width: 64, height: 352 })
   for (const [row, name] of ['grass', 'path', 'soil', 'water', 'rock-ground'].entries()) {
     atlas.families[name].variants.forEach((layer, column) => expect(layer.rect).toEqual({ x: column * 16, y: row * 16, width: 16, height: 16 }))
   }
