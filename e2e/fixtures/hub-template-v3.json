@@ -1,0 +1,531 @@
+{
+  "provenance": "Code-derived fresh hub template v3, not a live database snapshot. baseTerrainAt and TerrainType executed from read-only backend Java in /tmp; soil rectangles/template objects extracted from seedTemplate. reconcileHubLayout is already reflected by baseTerrainAt. Outer regions use seed=1/version=3 and the checked-in YAML patterns.",
+  "sources": {
+    "src/main/java/com/projecteden/world/ecology/WorldEcologyService.java": "1d2a8efaf6d0cb902d01a52880e452da26aa1f22229f5cabbce121df401b9afd",
+    "src/main/java/com/projecteden/world/ecology/WorldHubLayout.java": "2bbea105ebbff70be481402dd48ea6cdd99e38ec22b3afa29977487fd5479b80",
+    "src/main/java/com/projecteden/world/ecology/TerrainType.java": "928dca8ec41114cb2ee117b41491b57429eb9a1deb3113a31e0f120b1c93e234",
+    "src/main/resources/world/region-templates-v2.yml": "f018e797fa340aa29a18a54ce3ce6188ba51eb3c9b5e6b76236b7eb6c0531fed"
+  },
+  "hubBounds": {
+    "minX": 0,
+    "minY": 0,
+    "maxX": 23,
+    "maxY": 15
+  },
+  "worldBounds": {
+    "minX": -8,
+    "minY": -8,
+    "maxX": 31,
+    "maxY": 23
+  },
+  "rows": [
+    "FFFFFFFFFFFFFFFFFFFFFFFF",
+    "FFFFFFFFFFFFFFFFFFFFFFFF",
+    "FFGGGGGGGGGRGGGGGGGGGGFF",
+    "FFGGGGGGGGGRGHHHGGGGGGFF",
+    "FFGSSSSGGGGRGHHHGGGGGGFF",
+    "FFGSSSSGGGGRGHHHGGGGGGFF",
+    "FFGGGGGGGGGRGGRGGGGGGGFF",
+    "FFRRRRRRRRRRRRRRRRRRRRFF",
+    "FFGGGGGGGGGRGGGGGGGGGGFF",
+    "FFSSSSGGGGGRGGGGGGGGGGFF",
+    "FFSSSSGSSSSRGGGGGGGGGGFF",
+    "FFGGGGGSSSSRGGGGGWWWWWWG",
+    "FFSSSSGGGGGRGGGGGWWWWWWG",
+    "FFSSSSGGGGGRGGGGGBBBBBBR",
+    "FFFFFFFFFFFFFFFFFWWWWWWG",
+    "FFFFFFFFFFFFFFFFFWWWWWWG"
+  ],
+  "counts": {
+    "FOREST": 124,
+    "GRASS": 156,
+    "ROAD": 33,
+    "BUILDING": 9,
+    "SOIL": 32,
+    "WATER": 24,
+    "BRIDGE": 6
+  },
+  "placedObjects": [
+    {
+      "id": 1,
+      "templateKey": "TEMPLATE_PLAZA",
+      "assetType": "PLAZA",
+      "worldCategory": "MEMORY",
+      "x": 528,
+      "y": 336
+    },
+    {
+      "id": 2,
+      "templateKey": "TEMPLATE_FARM_EMPTY",
+      "assetType": "FARM_PLOT_EMPTY",
+      "worldCategory": "NATURE",
+      "x": 144,
+      "y": 432
+    },
+    {
+      "id": 3,
+      "templateKey": "TEMPLATE_HOUSE",
+      "assetType": "COMMUNITY_HOUSE",
+      "worldCategory": "MEMORY",
+      "x": 672,
+      "y": 288
+    },
+    {
+      "id": 4,
+      "templateKey": "TEMPLATE_GUIDE",
+      "assetType": "DEFAULT_NPC_GUIDE",
+      "worldCategory": "MEMORY",
+      "x": 480,
+      "y": 288
+    },
+    {
+      "id": 5,
+      "templateKey": "TEMPLATE_GARDENER",
+      "assetType": "DEFAULT_NPC_GARDENER",
+      "worldCategory": "NATURE",
+      "x": 240,
+      "y": 384
+    },
+    {
+      "id": 6,
+      "templateKey": "TEMPLATE_KEEPER",
+      "assetType": "DEFAULT_NPC_MEMORY_KEEPER",
+      "worldCategory": "MEMORY",
+      "x": 576,
+      "y": 432
+    },
+    {
+      "id": 7,
+      "templateKey": "TEMPLATE_CARETAKER",
+      "assetType": "DEFAULT_NPC_ANIMAL_CARETAKER",
+      "worldCategory": "ANIMAL",
+      "x": 768,
+      "y": 384
+    },
+    {
+      "id": 8,
+      "templateKey": "TEMPLATE_DOG",
+      "assetType": "DEFAULT_DOG",
+      "worldCategory": "ANIMAL",
+      "x": 816,
+      "y": 432
+    },
+    {
+      "id": 9,
+      "templateKey": "TEMPLATE_CAT",
+      "assetType": "DEFAULT_CAT",
+      "worldCategory": "ANIMAL",
+      "x": 864,
+      "y": 432
+    },
+    {
+      "id": 10,
+      "templateKey": "TEMPLATE_BIRD_A",
+      "assetType": "DEFAULT_BIRD",
+      "worldCategory": "ANIMAL",
+      "x": 912,
+      "y": 384
+    },
+    {
+      "id": 11,
+      "templateKey": "TEMPLATE_BIRD_B",
+      "assetType": "DEFAULT_BIRD",
+      "worldCategory": "ANIMAL",
+      "x": 960,
+      "y": 384
+    },
+    {
+      "id": 12,
+      "templateKey": "TEMPLATE_CARROT_0_0",
+      "assetType": "FARM_CARROT",
+      "worldCategory": "FOOD",
+      "x": 96,
+      "y": 576
+    },
+    {
+      "id": 13,
+      "templateKey": "TEMPLATE_CARROT_0_1",
+      "assetType": "FARM_CARROT",
+      "worldCategory": "FOOD",
+      "x": 144,
+      "y": 576
+    },
+    {
+      "id": 14,
+      "templateKey": "TEMPLATE_CARROT_0_2",
+      "assetType": "FARM_CARROT",
+      "worldCategory": "FOOD",
+      "x": 192,
+      "y": 576
+    },
+    {
+      "id": 15,
+      "templateKey": "TEMPLATE_CARROT_0_3",
+      "assetType": "FARM_CARROT",
+      "worldCategory": "FOOD",
+      "x": 240,
+      "y": 576
+    },
+    {
+      "id": 16,
+      "templateKey": "TEMPLATE_CARROT_1_0",
+      "assetType": "FARM_CARROT",
+      "worldCategory": "FOOD",
+      "x": 96,
+      "y": 624
+    },
+    {
+      "id": 17,
+      "templateKey": "TEMPLATE_CARROT_1_1",
+      "assetType": "FARM_CARROT",
+      "worldCategory": "FOOD",
+      "x": 144,
+      "y": 624
+    },
+    {
+      "id": 18,
+      "templateKey": "TEMPLATE_CARROT_1_2",
+      "assetType": "FARM_CARROT",
+      "worldCategory": "FOOD",
+      "x": 192,
+      "y": 624
+    },
+    {
+      "id": 19,
+      "templateKey": "TEMPLATE_CARROT_1_3",
+      "assetType": "FARM_CARROT",
+      "worldCategory": "FOOD",
+      "x": 240,
+      "y": 624
+    },
+    {
+      "id": 20,
+      "templateKey": "TEMPLATE_FLOWER_0_0",
+      "assetType": "FARM_FLOWER",
+      "worldCategory": "NATURE",
+      "x": 144,
+      "y": 192
+    },
+    {
+      "id": 21,
+      "templateKey": "TEMPLATE_FLOWER_0_1",
+      "assetType": "FARM_FLOWER",
+      "worldCategory": "NATURE",
+      "x": 192,
+      "y": 192
+    },
+    {
+      "id": 22,
+      "templateKey": "TEMPLATE_FLOWER_0_2",
+      "assetType": "FARM_FLOWER",
+      "worldCategory": "NATURE",
+      "x": 240,
+      "y": 192
+    },
+    {
+      "id": 23,
+      "templateKey": "TEMPLATE_FLOWER_0_3",
+      "assetType": "FARM_FLOWER",
+      "worldCategory": "NATURE",
+      "x": 288,
+      "y": 192
+    },
+    {
+      "id": 24,
+      "templateKey": "TEMPLATE_FLOWER_1_0",
+      "assetType": "FARM_FLOWER",
+      "worldCategory": "NATURE",
+      "x": 144,
+      "y": 240
+    },
+    {
+      "id": 25,
+      "templateKey": "TEMPLATE_FLOWER_1_1",
+      "assetType": "FARM_FLOWER",
+      "worldCategory": "NATURE",
+      "x": 192,
+      "y": 240
+    },
+    {
+      "id": 26,
+      "templateKey": "TEMPLATE_FLOWER_1_2",
+      "assetType": "FARM_FLOWER",
+      "worldCategory": "NATURE",
+      "x": 240,
+      "y": 240
+    },
+    {
+      "id": 27,
+      "templateKey": "TEMPLATE_FLOWER_1_3",
+      "assetType": "FARM_FLOWER",
+      "worldCategory": "NATURE",
+      "x": 288,
+      "y": 240
+    },
+    {
+      "id": 28,
+      "templateKey": "TEMPLATE_TOMATO_0_0",
+      "assetType": "FARM_TOMATO",
+      "worldCategory": "FOOD",
+      "x": 336,
+      "y": 480
+    },
+    {
+      "id": 29,
+      "templateKey": "TEMPLATE_TOMATO_0_1",
+      "assetType": "FARM_TOMATO",
+      "worldCategory": "FOOD",
+      "x": 384,
+      "y": 480
+    },
+    {
+      "id": 30,
+      "templateKey": "TEMPLATE_TOMATO_1_0",
+      "assetType": "FARM_TOMATO",
+      "worldCategory": "FOOD",
+      "x": 336,
+      "y": 528
+    },
+    {
+      "id": 31,
+      "templateKey": "TEMPLATE_TOMATO_1_1",
+      "assetType": "FARM_TOMATO",
+      "worldCategory": "FOOD",
+      "x": 384,
+      "y": 528
+    },
+    {
+      "id": 32,
+      "templateKey": "TEMPLATE_CABBAGE_0_0",
+      "assetType": "FARM_CABBAGE",
+      "worldCategory": "FOOD",
+      "x": 432,
+      "y": 480
+    },
+    {
+      "id": 33,
+      "templateKey": "TEMPLATE_CABBAGE_0_1",
+      "assetType": "FARM_CABBAGE",
+      "worldCategory": "FOOD",
+      "x": 480,
+      "y": 480
+    },
+    {
+      "id": 34,
+      "templateKey": "TEMPLATE_CABBAGE_1_0",
+      "assetType": "FARM_CABBAGE",
+      "worldCategory": "FOOD",
+      "x": 432,
+      "y": 528
+    },
+    {
+      "id": 35,
+      "templateKey": "TEMPLATE_CABBAGE_1_1",
+      "assetType": "FARM_CABBAGE",
+      "worldCategory": "FOOD",
+      "x": 480,
+      "y": 528
+    }
+  ],
+  "outerTemplates": {
+    "MEADOW": {
+      "rows": [
+        "RRRRRRRR",
+        "GGFREFGG",
+        "GGGRGGGG",
+        "RRRRRRRR",
+        "GGFREGGG",
+        "GGGREGFG",
+        "GFGREGGG",
+        "RRRRRRRR"
+      ],
+      "decorations": [
+        {
+          "type": "MEADOW_FLOWERS",
+          "localX": 2,
+          "localY": 1
+        },
+        {
+          "type": "MEADOW_BUSH",
+          "localX": 5,
+          "localY": 4
+        },
+        {
+          "type": "MEADOW_STONE",
+          "localX": 1,
+          "localY": 6
+        }
+      ]
+    },
+    "FOREST": {
+      "rows": [
+        "XXFRFXXX",
+        "XFFRFFFX",
+        "XFXRFXFX",
+        "RRRRRRRR",
+        "XFFRFFFX",
+        "XFGRFGFX",
+        "XFFRFFFX",
+        "RRRRRRRR"
+      ],
+      "decorations": [
+        {
+          "type": "FOREST_TREE",
+          "localX": 0,
+          "localY": 0
+        },
+        {
+          "type": "FOREST_TREE",
+          "localX": 7,
+          "localY": 0
+        },
+        {
+          "type": "FOREST_TREE",
+          "localX": 1,
+          "localY": 6
+        },
+        {
+          "type": "FOREST_TREE",
+          "localX": 6,
+          "localY": 6
+        },
+        {
+          "type": "FOREST_GRASS",
+          "localX": 5,
+          "localY": 5
+        }
+      ]
+    },
+    "POND": {
+      "rows": [
+        "RRRRRRRR",
+        "GWWBWWGG",
+        "GWWBWWGG",
+        "RBBBBBBR",
+        "GWWBWWGG",
+        "GWWBWWGG",
+        "GWWBWWGG",
+        "RRRRRRRR"
+      ],
+      "decorations": [
+        {
+          "type": "POND_REED",
+          "localX": 1,
+          "localY": 1
+        },
+        {
+          "type": "POND_LOTUS",
+          "localX": 5,
+          "localY": 2
+        },
+        {
+          "type": "POND_STONE",
+          "localX": 6,
+          "localY": 6
+        }
+      ]
+    }
+  },
+  "regions": [
+    {
+      "chunkX": -1,
+      "chunkY": -1,
+      "regionType": "MEADOW"
+    },
+    {
+      "chunkX": 0,
+      "chunkY": -1,
+      "regionType": "FOREST"
+    },
+    {
+      "chunkX": 1,
+      "chunkY": -1,
+      "regionType": "MEADOW"
+    },
+    {
+      "chunkX": 2,
+      "chunkY": -1,
+      "regionType": "POND"
+    },
+    {
+      "chunkX": 3,
+      "chunkY": -1,
+      "regionType": "MEADOW"
+    },
+    {
+      "chunkX": -1,
+      "chunkY": 0,
+      "regionType": "MEADOW"
+    },
+    {
+      "chunkX": 0,
+      "chunkY": 0,
+      "regionType": "HUB"
+    },
+    {
+      "chunkX": 1,
+      "chunkY": 0,
+      "regionType": "HUB"
+    },
+    {
+      "chunkX": 2,
+      "chunkY": 0,
+      "regionType": "HUB"
+    },
+    {
+      "chunkX": 3,
+      "chunkY": 0,
+      "regionType": "FOREST"
+    },
+    {
+      "chunkX": -1,
+      "chunkY": 1,
+      "regionType": "MEADOW"
+    },
+    {
+      "chunkX": 0,
+      "chunkY": 1,
+      "regionType": "HUB"
+    },
+    {
+      "chunkX": 1,
+      "chunkY": 1,
+      "regionType": "HUB"
+    },
+    {
+      "chunkX": 2,
+      "chunkY": 1,
+      "regionType": "HUB"
+    },
+    {
+      "chunkX": 3,
+      "chunkY": 1,
+      "regionType": "FOREST"
+    },
+    {
+      "chunkX": -1,
+      "chunkY": 2,
+      "regionType": "POND"
+    },
+    {
+      "chunkX": 0,
+      "chunkY": 2,
+      "regionType": "POND"
+    },
+    {
+      "chunkX": 1,
+      "chunkY": 2,
+      "regionType": "POND"
+    },
+    {
+      "chunkX": 2,
+      "chunkY": 2,
+      "regionType": "FOREST"
+    },
+    {
+      "chunkX": 3,
+      "chunkY": 2,
+      "regionType": "FOREST"
+    }
+  ]
+}

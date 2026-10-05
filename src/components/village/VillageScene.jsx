@@ -12,6 +12,8 @@ import {
   tileToPixel,
 } from './worldViewport'
 import { bridgeVisualStyle, communityHouseVisualStyle } from './worldHubLayout'
+import { resolveWorldTiles } from './worldTileResolver'
+import PixelTerrainLayer from './PixelTerrainLayer'
 
 const EMPTY_ARRAY = []
 
@@ -346,9 +348,10 @@ function VillageScene({ compact = false, characterPosition, hasMemory = false, a
     worldBounds: worldState?.mapBounds,
     cameraScale,
   }), [cameraScale, characterPosition?.x, characterPosition?.y, viewport.height, viewport.width, worldState?.mapBounds])
+  const resolvedTerrain = useMemo(() => resolveWorldTiles(terrainTiles), [terrainTiles])
   const visibleTerrain = useMemo(
-    () => terrainTiles.filter((tile) => tileIsVisible(tile.x, tile.y, renderBounds)),
-    [renderBounds, terrainTiles],
+    () => resolvedTerrain.filter((tile) => tileIsVisible(tile.x, tile.y, renderBounds)),
+    [renderBounds, resolvedTerrain],
   )
   const pinnedTargetId = pinnedInteraction?.targetId ?? null
   const visibleObjects = useMemo(
@@ -486,15 +489,16 @@ function VillageScene({ compact = false, characterPosition, hasMemory = false, a
         <div className="pixel-sky"><span className="pixel-sun" /><span className="distant-hill distant-hill--one" /><span className="distant-hill distant-hill--two" /></div>
         <div className="grass-tiles" />
         <div className="world-coordinate-layer">
-          <div className="persistent-terrain" aria-hidden="true" data-total-count={terrainTiles.length} data-rendered-count={visibleTerrain.length}>{visibleTerrain.map((tile) => <i key={`${tile.x}-${tile.y}`} className={`terrain-tile terrain-${String(tile.terrainType).toLowerCase()}`} style={{ left: `${tileToPixel(tile.x)}px`, top: `${tileToPixel(tile.y)}px` }} />)}</div>
+          <div className="persistent-terrain" aria-hidden="true" data-total-count={terrainTiles.length} data-rendered-count={visibleTerrain.length}>{visibleTerrain.map((tile) => <i key={`${tile.x}-${tile.y}`} className={`terrain-tile ${tile.className}`} style={{ left: `${tileToPixel(tile.x)}px`, top: `${tileToPixel(tile.y)}px` }} />)}</div>
+          <PixelTerrainLayer tiles={visibleTerrain} />
           <RegionDecorations chunks={worldState?.worldChunks} />
           <VillageVisualDecor renderBounds={renderBounds} />
           <TileInteractions interactions={visibleInteractions} selectedInteraction={selectedInteraction} onSelect={selectInteraction} />
-          <div className="ground-flora" aria-hidden="true">
+          {terrainTiles.length === 0 && <div className="ground-flora" aria-hidden="true">
           {grassDetails.map((detail) => <span className={`grass-clump ${detail}`} key={detail} />)}
           {stoneDetails.map((detail) => <span className={`field-stone ${detail}`} key={detail} />)}
           {leafDetails.map((detail) => <span className={`fallen-leaf ${detail}`} key={detail} />)}
-        </div>
+        </div>}
           <div className="persistent-world-objects" data-total-count={persistentObjects.length + runtimeNpcs.length} data-rendered-count={visibleObjects.length + visibleNpcs.length}>
             {visibleObjects.map((object) => <PersistentWorldObject key={object.id} object={object} />)}
             {visibleNpcs.map((npc) => (
