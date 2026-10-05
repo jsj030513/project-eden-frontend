@@ -535,7 +535,7 @@ function VillagePage({ villageState, villageRevealState, tutorialState, successT
             </div>
           </section>
         )}
-        <VirtualJoystick onMove={setJoystickVector} onStop={stopJoystick} disabled={isRevealActive || activePanel === 'DIALOGUE'} />
+        <VirtualJoystick surfaceRef={villageStageRef} onMove={setJoystickVector} onStop={stopJoystick} disabled={isRevealActive || activePanel === 'DIALOGUE'} />
         <div className="village-action-bar">
           <span><i aria-hidden="true">JOY</i> 천천히 마을 산책하기</span>
           <button className="capture-icon-button" type="button" onClick={() => openMemoryUpload()} disabled={isRevealActive} aria-label="오늘의 순간 남기기">
