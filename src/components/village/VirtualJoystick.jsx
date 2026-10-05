@@ -7,7 +7,7 @@ const TOP_EXCLUSION = 58
 const CONTROL_AREA_RATIO = 0.5
 const JOYSTICK_RADIUS = 50
 const JOYSTICK_EDGE_GAP = 14
-const BLOCKED_TARGET_SELECTOR = 'button, input, textarea, select, a, [role="button"], [data-no-joystick]'
+const BLOCKED_TARGET_SELECTOR = 'button, input, textarea, select, a, aside, [role="button"], [data-no-joystick]'
 
 function normalizeVector(vector) {
   const magnitude = Math.hypot(vector.x, vector.y)
@@ -67,7 +67,8 @@ function canStartJoystick(event) {
   return event.clientX <= window.innerWidth * CONTROL_AREA_RATIO
 }
 
-function VirtualJoystick({ onMove, onStop, disabled = false }) {
+function VirtualJoystick({ surfaceRef, onMove, onStop, disabled = false }) {
+  const joystickRef = useRef(null)
   const activePointerRef = useRef(null)
   const originRef = useRef({ x: 0, y: 0 })
   const [handlePosition, setHandlePosition] = useState({ x: 0, y: 0 })
@@ -83,8 +84,9 @@ function VirtualJoystick({ onMove, onStop, disabled = false }) {
     onMove(vector)
   }, [onMove])
 
-  const handlePointerDown = (event) => {
-    if (disabled) return
+  const handlePointerDown = useCallback((event) => {
+    const joystick = joystickRef.current
+    if (disabled || event.defaultPrevented || !joystick?.getClientRects().length) return
     if (activePointerRef.current !== null || !canStartJoystick(event)) return
 
     event.preventDefault()
@@ -94,8 +96,8 @@ function VirtualJoystick({ onMove, onStop, disabled = false }) {
     originRef.current = origin
     activePointerRef.current = event.pointerId
 
-    if (event.currentTarget.setPointerCapture) {
-      event.currentTarget.setPointerCapture(event.pointerId)
+    if (joystick.setPointerCapture) {
+      joystick.setPointerCapture(event.pointerId)
     }
 
     setHandlePosition({ x: 0, y: 0 })
@@ -105,7 +107,15 @@ function VirtualJoystick({ onMove, onStop, disabled = false }) {
       originY: origin.y,
     })
     onMove({ x: 0, y: 0 })
-  }
+  }, [disabled, onMove])
+
+  useEffect(() => {
+    const surface = surfaceRef.current
+    // Start on the real hit target so buttons and panels keep their pointer input.
+    // The visual overlay owns capture only after a background drag has started.
+    surface?.addEventListener('pointerdown', handlePointerDown)
+    return () => surface?.removeEventListener('pointerdown', handlePointerDown)
+  }, [surfaceRef, handlePointerDown])
 
   const handlePointerMove = (event) => {
     if (disabled) return
@@ -139,10 +149,10 @@ function VirtualJoystick({ onMove, onStop, disabled = false }) {
 
   return (
     <div
+      ref={joystickRef}
       className={`virtual-joystick${joystickState.isActive ? ' is-active' : ''}${disabled ? ' is-disabled' : ''}`}
       aria-label="캐릭터 이동 조이스틱"
       aria-disabled={disabled}
-      onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={resetJoystick}
