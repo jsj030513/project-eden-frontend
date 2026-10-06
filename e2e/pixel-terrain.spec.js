@@ -102,6 +102,7 @@ for (const viewport of [{ width: 1280, height: 720 }, { width: 375, height: 667 
       for (const coordinate of supported) expect(overlayCoordinates).toContainEqual(coordinate)
       await page.getByRole('button', { name: '좌표 10, 10 살펴보기', exact: true }).click()
       await expect(page.getByRole('complementary', { name: '타일 살펴보기' })).toBeVisible()
+      await expect(page.getByRole('button', { name: '사진 분석', exact: true })).toBeVisible()
       await page.getByRole('button', { name: '타일 정보 닫기' }).click()
       expect(unexpected).toEqual([])
     })

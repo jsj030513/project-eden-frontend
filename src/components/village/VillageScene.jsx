@@ -279,7 +279,7 @@ function TileInteractions({ interactions = [], selectedInteraction, onSelect }) 
   })}</div>
 }
 
-function TileInspectPanel({ details, onClose, onPlantMemory }) {
+function TileInspectPanel({ details, onClose, onPlantMemory, onAnalyzePhoto }) {
   if (!details) return null
 
   const { interaction, tile, objects } = details
@@ -311,12 +311,13 @@ function TileInspectPanel({ details, onClose, onPlantMemory }) {
         )}
       </section>
       {isEmptyFarm && <section className="tile-inspect-panel__farm"><h3>비어 있는 밭</h3><p>아직 이 밭에는 특별한 기억이 심어지지 않았어요.<br />심고 싶은 식물이나 채소를 촬영하거나 사진에서 골라 직접 심어보세요!</p><button type="button" onClick={() => { onClose(); onPlantMemory?.() }}>사진으로 기억 심기</button></section>}
+      <section className="tile-inspect-panel__vision"><h3>Eden Vision</h3><p>사진을 선택해 분석해 보세요.</p><button type="button" onClick={() => onAnalyzePhoto?.(interaction)}>사진 분석</button></section>
     </aside>
   )
 }
 
-function VillageScene({ compact = false, characterPosition, hasMemory = false, apiTheme, revealState, tutorialStep, worldState, characterElementRef, worldElementRef, onPlantMemory, activePanel = 'NONE', pinnedInteraction = null, onOpenInspect, onCloseInspect }) {
-  const [selectedInteraction, setSelectedInteraction] = useState(null)
+function VillageScene({ compact = false, characterPosition, hasMemory = false, apiTheme, revealState, tutorialStep, worldState, characterElementRef, worldElementRef, onPlantMemory, onAnalyzePhoto, initialInspectInteraction = null, activePanel = 'NONE', pinnedInteraction = null, onOpenInspect, onCloseInspect }) {
+  const [selectedInteraction, setSelectedInteraction] = useState(initialInspectInteraction)
   const [viewport, setViewport] = useState(() => ({
     width: typeof window === 'undefined' ? 1440 : window.innerWidth,
     height: typeof window === 'undefined' ? 900 : window.innerHeight,
@@ -532,7 +533,7 @@ function VillageScene({ compact = false, characterPosition, hasMemory = false, a
         </div>
       </div>
       <div className="scene-vignette" />
-      {activePanel === 'INSPECT' && <TileInspectPanel details={selectedDetails} onClose={closeSelection} onPlantMemory={onPlantMemory} />}
+      {activePanel === 'INSPECT' && <TileInspectPanel details={selectedDetails} onClose={closeSelection} onPlantMemory={onPlantMemory} onAnalyzePhoto={onAnalyzePhoto} />}
     </div>
   )
 }

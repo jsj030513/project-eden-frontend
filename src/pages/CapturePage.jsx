@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { useVisionCapture, VISION_FILE_ACCEPT } from '../hooks/useVisionCapture'
+import VisionRanking from '../components/vision/VisionRanking'
 
 const CAPTURE_STATE = {
   IDLE: 'idle',
@@ -14,7 +16,8 @@ const STATUS_MESSAGE = {
 }
 
 function CapturePage({
-  captureState,
+  mode = 'memory',
+  captureState = {},
   targetContext,
   tutorialState,
   onBack,
@@ -32,6 +35,9 @@ function CapturePage({
   const [localCaptureState, setLocalCaptureState] = useState(CAPTURE_STATE.IDLE)
   const [selectedFile, setSelectedFile] = useState(null)
   const [previewUrl, setPreviewUrl] = useState(null)
+  const [previewFailed, setPreviewFailed] = useState(false)
+  const isVision = mode === 'vision'
+  const vision = useVisionCapture()
 
   const clearPreviewUrl = () => {
     if (previewUrlRef.current) {
@@ -45,14 +51,17 @@ function CapturePage({
     event.target.value = ''
 
     if (!file) return
+    if (isVision && vision.isAnalyzing) return
 
     clearPreviewUrl()
     const nextPreviewUrl = URL.createObjectURL(file)
     previewUrlRef.current = nextPreviewUrl
     setSelectedFile(file)
     setPreviewUrl(nextPreviewUrl)
+    setPreviewFailed(false)
     setLocalCaptureState(CAPTURE_STATE.PREVIEW)
-    onResetCapture()
+    if (isVision) vision.resetVision(file)
+    else onResetCapture()
   }
 
   const resetSelection = () => {
@@ -64,7 +73,11 @@ function CapturePage({
     setLocalCaptureState(CAPTURE_STATE.IDLE)
     submitLockRef.current = false
     retryLockRef.current = false
-    onResetCapture()
+    if (isVision) {
+      setPreviewFailed(false)
+      vision.resetVision()
+    }
+    else onResetCapture()
   }
 
   const saveMemory = () => {
@@ -157,6 +170,58 @@ function CapturePage({
       secondary: '같은 사진 다시 살펴보기',
     },
   }[captureState.status]
+
+  if (isVision) {
+    return (
+      <main className="capture-page capture-page--vision page-enter">
+        <div
+          className={`capture-view capture-view--vision capture-view--${vision.isAnalyzing ? 'saving' : localCaptureState}`}
+          aria-label="Eden Vision 사진 분석 화면"
+          data-capture-mode="vision"
+          data-capture-status={vision.status}
+        >
+          <div className="capture-sun" />
+          <div className="capture-ridge capture-ridge--back" />
+          <div className="capture-ridge capture-ridge--front" />
+          <input ref={cameraInputRef} className="capture-file-input" type="file" aria-label="분석할 사진 촬영" accept={VISION_FILE_ACCEPT} capture="environment" disabled={vision.isAnalyzing} onChange={selectFile} />
+          <input ref={libraryInputRef} className="capture-file-input" type="file" aria-label="분석할 사진 선택" accept={VISION_FILE_ACCEPT} disabled={vision.isAnalyzing} onChange={selectFile} />
+          <div className="capture-vision-content">
+            <section className="capture-copy">
+              <p className="eyebrow">EDEN VISION</p>
+              <h1>사진 분석</h1>
+              {vision.visionResult === null && <p>사진을 선택하면 Eden Vision으로 분석할 수 있어요.<br />최대 10MiB까지 선택할 수 있어요.</p>}
+              <div role="status" aria-live="polite">
+                {vision.isAnalyzing && <p>사진을 분석하고 있습니다.</p>}
+                {vision.visionResult && <p>분석 응답을 받았습니다.</p>}
+              </div>
+              {vision.error && <p className="capture-vision-error" role="alert">{vision.error.message}</p>}
+              {vision.visionResult !== null && <VisionRanking result={vision.visionResult} />}
+              <div className="capture-actions" aria-busy={vision.isAnalyzing}>
+                {vision.visionResult !== null
+                  ? <button type="button" onClick={resetSelection}>다른 사진 분석</button>
+                  : <>
+                    <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={vision.isAnalyzing}>카메라 열기</button>
+                    <button type="button" onClick={() => libraryInputRef.current?.click()} disabled={vision.isAnalyzing}>{selectedFile ? '다시 선택하기' : '사진에서 선택하기'}</button>
+                    {vision.error?.status === 401
+                      ? <button type="button" onClick={onAuthError}>다시 로그인하기</button>
+                      : <button type="button" onClick={() => vision.analyzeImage(selectedFile)} disabled={vision.isAnalyzing}>{vision.isAnalyzing ? '분석 중…' : vision.error && selectedFile ? '다시 분석하기' : '분석하기'}</button>}
+                  </>}
+                <button type="button" className="capture-actions__quiet" onClick={onBack}>마을로 돌아가기</button>
+              </div>
+            </section>
+            {previewUrl && (
+              <figure className="capture-preview" aria-label="분석할 사진 미리보기">
+                {previewFailed
+                  ? <p className="capture-preview-fallback">미리보기를 지원하지 않는 형식일 수 있습니다</p>
+                  : <img key={previewUrl} src={previewUrl} alt="분석할 사진" onError={() => setPreviewFailed(true)} />}
+                <figcaption>{selectedFile.name}<br />{(selectedFile.size / (1024 * 1024)).toFixed(2)} MiB · {selectedFile.size.toLocaleString('ko-KR')} bytes</figcaption>
+              </figure>
+            )}
+          </div>
+        </div>
+      </main>
+    )
+  }
 
   return (
     <main className="capture-page page-enter">

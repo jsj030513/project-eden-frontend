@@ -341,6 +341,8 @@ function App() {
     error: null,
   })
   const [captureState, setCaptureState] = useState(emptyCaptureState)
+  const [captureMode, setCaptureMode] = useState('memory')
+  const [visionInspectInteraction, setVisionInspectInteraction] = useState(null)
   const [captureTargetContext, setCaptureTargetContext] = useState(null)
   const [villageState, setVillageState] = useState({
     village: null,
@@ -441,6 +443,8 @@ function App() {
     setCaptureState(emptyCaptureState())
     setCaptureTargetContext(null)
     captureCompletionRef.current = false
+    setCaptureMode('memory')
+    setVisionInspectInteraction(null)
     skipNextVillageFetchRef.current = false
     worldChunkCacheRef.current.reset()
     setTutorialState(createInitialTutorialState(readTutorialCompleted()))
@@ -1126,10 +1130,12 @@ function App() {
   }, [handleTutorialEvent, page, villageRevealState.isPending])
 
   useEffect(() => {
-    if (page === PAGES.CAPTURE) {
+    if (page === PAGES.CAPTURE && captureMode === 'memory') {
       handleTutorialEvent(TUTORIAL_EVENTS.ENTERED_CAPTURE)
     }
-  }, [handleTutorialEvent, page])
+  }, [captureMode, handleTutorialEvent, page])
+
+  const clearVisionInspectInteraction = useCallback(() => setVisionInspectInteraction(null), [])
 
   const closeCapture = useCallback(() => {
     captureCompletionRef.current = false
@@ -1153,9 +1159,20 @@ function App() {
   const openCapture = (targetContext = null) => {
     if (page === PAGES.CAPTURE) return
     closeNpcDialogue()
+    setCaptureMode('memory')
+    setVisionInspectInteraction(null)
     captureCompletionRef.current = false
     setCaptureState(emptyCaptureState())
     setCaptureTargetContext(normalizeCaptureTargetContext(targetContext))
+    setPage(PAGES.CAPTURE)
+  }
+
+  const openVisionCapture = (interaction) => {
+    if (page === PAGES.CAPTURE) return
+    closeNpcDialogue()
+    setCaptureMode('vision')
+    setCaptureTargetContext(null)
+    setVisionInspectInteraction(interaction)
     setPage(PAGES.CAPTURE)
   }
 
@@ -1211,6 +1228,9 @@ function App() {
             successToast={successToast}
             captureOpen={page === PAGES.CAPTURE}
             onCapture={openCapture}
+            onVisionCapture={openVisionCapture}
+            initialInspectInteraction={visionInspectInteraction}
+            onInspectRestored={clearVisionInspectInteraction}
             onRetryVillage={() => fetchVillageData().catch(() => {})}
             onTalkToNpc={fetchNpcDialogue}
             onCloseNpcDialogue={closeNpcDialogue}
@@ -1223,6 +1243,9 @@ function App() {
           />
         )
       case PAGES.CAPTURE:
+        if (captureMode === 'vision') {
+          return <CapturePage mode="vision" onBack={closeCapture} onAuthError={resetAuth} />
+        }
         return (
           <CapturePage
             captureState={captureState}
@@ -1244,12 +1267,12 @@ function App() {
   return (
     <AppShell currentPage={page} onLogoClick={() => setPage(PAGES.LANDING)}>
       {renderPage()}
-      <TutorialOverlay
+      {!(page === PAGES.CAPTURE && captureMode === 'vision') && <TutorialOverlay
         tutorialState={tutorialState}
         page={page}
         onAdvance={() => handleTutorialEvent(tutorialState.currentStep === TUTORIAL_STEPS.COMPLETE ? TUTORIAL_EVENTS.FINISHED : TUTORIAL_EVENTS.START)}
         onSkip={() => handleTutorialEvent(TUTORIAL_EVENTS.SKIPPED)}
-      />
+      />}
     </AppShell>
   )
 }
