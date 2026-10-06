@@ -29,16 +29,16 @@ import {
 const TUTORIAL_MOVE_DISTANCE = 32
 const EMPTY_INTERACTIONS = Object.freeze([])
 
-function VillagePage({ villageState, villageRevealState, tutorialState, successToast, captureOpen = false, onCapture, onRetryVillage, onRefreshWorldState, onTutorialEvent, onMove, onMovementEnd, onPinnedInteractionChange }) {
+function VillagePage({ villageState, villageRevealState, tutorialState, successToast, captureOpen = false, onCapture, onVisionCapture, initialInspectInteraction = null, onInspectRestored, onRetryVillage, onRefreshWorldState, onTutorialEvent, onMove, onMovementEnd, onPinnedInteractionChange }) {
   const hasWorldState = Boolean(villageState.worldState)
-  const [activePanel, setActivePanel] = useState('NONE')
+  const [activePanel, setActivePanel] = useState(initialInspectInteraction ? 'INSPECT' : 'NONE')
   const [templateDialogue, setTemplateDialogue] = useState(null)
   const [dialogueLineIndex, setDialogueLineIndex] = useState(0)
   const [serverDialogue, setServerDialogue] = useState(null)
   const [dialogueLoading, setDialogueLoading] = useState(false)
   const [dialogueError, setDialogueError] = useState(null)
   const [contextualInteraction, setContextualInteraction] = useState(null)
-  const [inspectInteraction, setInspectInteraction] = useState(null)
+  const [inspectInteraction, setInspectInteraction] = useState(initialInspectInteraction)
   const [regionBanner, setRegionBanner] = useState(null)
   const [npcProgressToast, setNpcProgressToast] = useState(null)
   const serverDialogueRef = useRef(null)
@@ -72,6 +72,7 @@ function VillagePage({ villageState, villageRevealState, tutorialState, successT
   const diagnosticWorldId = villageState.worldState?.worldId ?? null
   const diagnosticTerrainCount = villageState.worldState?.terrainTiles?.length ?? 0
   const diagnosticObjectCount = villageState.worldState?.placedObjects?.length ?? 0
+  useEffect(() => { onInspectRestored?.() }, [onInspectRestored])
   useEffect(() => {
     recordHydrationDiagnostic('VILLAGE_PAGE_RENDER', {
       worldId: diagnosticWorldId,
@@ -404,6 +405,8 @@ function VillagePage({ villageState, villageRevealState, tutorialState, successT
           characterElementRef={characterElementRef}
           worldElementRef={worldElementRef}
           onPlantMemory={openMemoryUpload}
+          onAnalyzePhoto={onVisionCapture}
+          initialInspectInteraction={initialInspectInteraction}
           activePanel={activePanel}
           pinnedInteraction={activePanel === 'DIALOGUE'
             ? currentHudInteraction || templateDialogue

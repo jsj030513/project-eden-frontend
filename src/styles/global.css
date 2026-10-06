@@ -932,6 +932,34 @@ body{overscroll-behavior:none;background:var(--forest-deep)}
     max-height:min(280px,38dvh)
   }
 }
+
+/* Vision-only layout keeps the existing memory camera rules unchanged. */
+.tile-inspect-panel__vision{margin-top:14px;padding-top:12px;border-top:1px solid #b6946c}
+.tile-inspect-panel__vision p{font-size:11px;line-height:1.6}
+.tile-inspect-panel__vision button{min-height:44px;padding:8px 11px;cursor:pointer}
+.capture-view--vision{overflow-y:auto;touch-action:pan-y}
+.capture-vision-content{position:relative;z-index:21;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:center;gap:28px;width:min(1100px,100%);min-height:100%;margin:auto;padding:calc(80px + env(safe-area-inset-top,0px)) max(24px,env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) max(24px,env(safe-area-inset-left,0px))}
+.capture-view--vision .capture-copy{position:static;max-width:none;transform:none;text-align:left}
+.capture-view--vision .capture-copy h1{font-size:clamp(30px,5vw,52px)}
+.capture-view--vision .capture-actions{justify-content:flex-start}
+.capture-view--vision .capture-preview{position:static;display:flex;flex-direction:column;width:100%;height:min(62dvh,480px);min-height:180px;transform:none;box-shadow:5px 6px rgba(24,28,20,.45)}
+.capture-view--vision .capture-preview img{flex:1;min-height:0;object-fit:contain}
+.capture-preview-fallback{display:grid;place-content:center;flex:1;padding:20px;line-height:1.7;text-align:center}
+.vision-ranking{min-width:0;margin-block:20px;overflow-wrap:anywhere}
+.vision-ranking h2{font-size:20px}
+.vision-ranking-list{list-style:none;padding:0;margin:16px 0;display:grid;gap:10px}
+.vision-ranking-item{display:grid;grid-template-columns:2ch minmax(0,1fr);gap:12px;padding:14px;border:1px solid #b6946c;background:var(--panel-deep)}
+.vision-ranking-primary{border-width:2px}
+.vision-ranking-item h3{font-size:18px;margin:4px 0}
+.capture-view--vision .vision-ranking-label,.capture-view--vision .vision-ranking-category{font-size:12px;margin:0;line-height:1.6}
+.capture-view--vision .vision-ranking-notice{font-size:14px;line-height:1.7}
+.capture-view--vision .capture-actions button{min-height:44px}
+.capture-view--vision figcaption{padding:10px 12px;background:var(--panel-deep);font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.capture-view--vision .capture-vision-error{padding:12px;border:2px solid var(--warm-light);background:var(--panel-deep);color:var(--text)}
+@media (max-width:760px){
+  .capture-vision-content{grid-template-columns:minmax(0,1fr);align-content:start;gap:20px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px))}
+  .capture-view--vision .capture-preview{height:34dvh;min-height:180px}
+}
 @media (max-width:430px){
   .community-history-summary li{grid-template-columns:minmax(0,1fr)}
   .community-history-summary time{justify-self:start}

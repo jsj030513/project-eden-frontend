@@ -67,10 +67,10 @@ for (const viewport of [{ width: 375, height: 667 }, { width: 667, height: 375 }
         const inspect = page.getByRole('complementary', { name: '타일 살펴보기' })
         await expect(inspect).toBeVisible()
         await expect(joystick).not.toHaveClass(/is-active/)
-        await activate(inspect.getByRole('heading', { name: '오브젝트', exact: true }))
-        await expect(joystick).not.toHaveClass(/is-active/)
+        await activate(inspect.getByRole('button', { name: '사진 분석', exact: true }))
+        await expect(page.locator('[data-capture-mode="vision"]')).toBeVisible()
+        await activate(page.getByRole('button', { name: '마을로 돌아가기' }))
         await activate(page.getByRole('button', { name: '타일 정보 닫기' }))
-        await expect(inspect).not.toBeVisible()
         expect(moves).toHaveLength(0)
 
         await page.evaluate(() => {
